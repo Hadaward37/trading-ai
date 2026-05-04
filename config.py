@@ -1,6 +1,6 @@
 """Centralised project configuration.
 
-All optimised parameters sourced from grid search (2026-05-04):
+Optimised parameters from grid search (2026-05-04):
   RSI(14) | Buy < 30 | Sell > 75 | SL 2.5x ATR | TP 4.0x ATR
   -> Sharpe 1.494 | Win Rate 45.2% | Max DD -0.42% (timeframe 1h)
 """
@@ -18,14 +18,14 @@ ROOT_DIR = Path(__file__).parent
 
 # ── Data source ───────────────────────────────────────────────────────────────
 SYMBOL      = "EURUSD=X"
-TIMEFRAMES  = ("15m", "1h")
+TIMEFRAMES  = ("15m", "1h", "4h")   # 4h is resampled from 1h internally
 DEFAULT_TF  = "1h"
 DB_PATH     = ROOT_DIR / "data" / "trading.db"
 
 # ── RSI  (optimised — grid search 2026-05-04) ─────────────────────────────────
 RSI_PERIOD = 14
-RSI_BUY    = 30   # buy  signal when RSI < RSI_BUY
-RSI_SELL   = 75   # sell signal when RSI > RSI_SELL
+RSI_BUY    = 30
+RSI_SELL   = 75
 
 # ── MACD ──────────────────────────────────────────────────────────────────────
 MACD_FAST = 12
@@ -35,26 +35,50 @@ MACD_SIGN = 9
 # ── Bollinger Bands ───────────────────────────────────────────────────────────
 BB_WINDOW    = 20
 BB_DEV       = 2.0
-BB_TOLERANCE = 0.002   # price within 0.2% of a band edge counts as a "touch"
+BB_TOLERANCE = 0.002
 
 # ── ATR ───────────────────────────────────────────────────────────────────────
 ATR_WINDOW = 14
 
+# ── ADX ───────────────────────────────────────────────────────────────────────
+ADX_WINDOW = 14
+
+# ── Stochastic ────────────────────────────────────────────────────────────────
+STOCH_K_WINDOW   = 14
+STOCH_SMOOTH_K   = 3
+STOCH_SMOOTH_D   = 3
+STOCH_OVERSOLD   = 20
+STOCH_OVERBOUGHT = 80
+
+# ── Market Regime ─────────────────────────────────────────────────────────────
+REGIME_ADX_TREND            = 25    # ADX >= this -> trending
+REGIME_ADX_RANGE            = 20    # ADX <  this -> range
+REGIME_VOLATILITY_THRESHOLD = 1.5   # ATR / ATR_50ma above this -> high vol
+REGIME_BLOCK_RANGE_SIGNALS  = True  # suppress BUY/SELL entries during Range
+
+# ── Multi-Timeframe ───────────────────────────────────────────────────────────
+MTF_MIN_AGREEMENTS = 2   # number of TFs that must agree for a valid MTF signal
+
+# ── Signal score weights (must sum to 100) ────────────────────────────────────
+SCORE_WEIGHT_RSI   = 25
+SCORE_WEIGHT_MACD  = 25
+SCORE_WEIGHT_BB    = 20
+SCORE_WEIGHT_ADX   = 15
+SCORE_WEIGHT_STOCH = 15
+
 # ── Backtest defaults (optimised) ─────────────────────────────────────────────
 INITIAL_CAPITAL   = 10_000.0
 POSITION_SIZE_PCT = 0.10
-SL_ATR_MULT       = 2.5   # stop-loss  distance in ATR multiples
-TP_ATR_MULT       = 4.0   # take-profit distance in ATR multiples
+SL_ATR_MULT       = 2.5
+TP_ATR_MULT       = 4.0
 
 # ── Dashboard ─────────────────────────────────────────────────────────────────
-CACHE_TTL_SECONDS = 900   # market-data cache lifetime (15 min)
+CACHE_TTL_SECONDS = 900
 
 # ── Telegram alerts ───────────────────────────────────────────────────────────
-# Set these in a .env file (copy .env.example -> .env and fill in the values).
-# Get a bot token from @BotFather and your chat_id from @userinfobot.
 TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID:   str = os.getenv("TELEGRAM_CHAT_ID", "")
 
 # ── Scheduler ─────────────────────────────────────────────────────────────────
-SCHEDULER_INTERVAL_MIN = 15        # how often to poll for new signals
-SCHEDULER_TIMEFRAME    = "1h"      # timeframe watched by the scheduler
+SCHEDULER_INTERVAL_MIN = 15
+SCHEDULER_TIMEFRAME    = "1h"

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pandas as pd
-from ta.momentum import RSIIndicator
-from ta.trend import MACD as MACDIndicator
+from ta.momentum import RSIIndicator, StochasticOscillator
+from ta.trend import MACD as MACDIndicator, ADXIndicator
 from ta.volatility import AverageTrueRange, BollingerBands
 
 
@@ -69,10 +69,54 @@ def add_atr(df: pd.DataFrame, window: int = 14) -> pd.DataFrame:
     return df
 
 
+def add_adx(df: pd.DataFrame, window: int = 14) -> pd.DataFrame:
+    """Append ADX and directional indicator columns to *df*.
+
+    Columns added: ``adx`` (trend strength 0-100), ``adx_pos`` (+DI),
+    ``adx_neg`` (-DI).
+    """
+    df = df.copy()
+    adx = ADXIndicator(
+        high=df["high"], low=df["low"], close=df["close"], window=window
+    )
+    df["adx"]     = adx.adx()
+    df["adx_pos"] = adx.adx_pos()
+    df["adx_neg"] = adx.adx_neg()
+    return df
+
+
+def add_stochastic(
+    df: pd.DataFrame,
+    k_window: int = 14,
+    smooth_k: int = 3,
+    smooth_d: int = 3,
+) -> pd.DataFrame:
+    """Append Stochastic Oscillator columns to *df*.
+
+    Columns added: ``stoch_k`` (%K smoothed), ``stoch_d`` (%D — signal line).
+    """
+    df = df.copy()
+    stoch = StochasticOscillator(
+        high=df["high"],
+        low=df["low"],
+        close=df["close"],
+        window=k_window,
+        smooth_window=smooth_k,
+    )
+    df["stoch_k"] = stoch.stoch()
+    df["stoch_d"] = stoch.stoch_signal()
+    return df
+
+
 def add_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Apply RSI, MACD, Bollinger Bands, and ATR to *df* in one call."""
+    """Apply all indicators to *df* in one call.
+
+    Computes: RSI, MACD, Bollinger Bands, ATR, ADX, Stochastic.
+    """
     df = add_rsi(df)
     df = add_macd(df)
     df = add_bollinger_bands(df)
     df = add_atr(df)
+    df = add_adx(df)
+    df = add_stochastic(df)
     return df

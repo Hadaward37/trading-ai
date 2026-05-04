@@ -1,4 +1,4 @@
-"""Streamlit dashboard — EUR/USD live signals & backtest results."""
+"""Streamlit dashboard — EUR/USD trading signals, regime & multi-timeframe."""
 
 from __future__ import annotations
 
@@ -14,8 +14,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import config
 from core.backtest import run_backtest
-from core.collector import fetch_ohlcv
+from core.collector import fetch_ohlcv, get_mtf_confluence
 from core.indicators import add_all_indicators
+from core.regime import detect_regime, regime_color, regime_emoji
 from core.signals import generate_signals_custom
 from db.database import save_ohlcv, save_signals
 
@@ -25,162 +26,204 @@ st.set_page_config(
     page_icon="📈",
     layout="wide",
 )
-
 st.title("📈 Trading AI — EUR/USD")
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    timeframe = st.selectbox("Timeframe", list(config.TIMEFRAMES), index=0)
+    timeframe = st.selectbox("Timeframe", list(config.TIMEFRAMES), index=1)  # default 1h
 
     st.markdown("---")
     refresh = st.button("🔄 Refresh market data", use_container_width=True)
-    st.caption("Market data cached 15 min to respect rate limits.")
+    st.caption("Market data cached 15 min.")
 
     st.markdown("---")
     st.subheader("Strategy params")
-    st.caption("Optimised via grid search (Sharpe 1.494)")
+    st.caption("Optimised via grid search — Sharpe 1.494")
     rsi_buy  = st.slider("RSI Buy  <",  10, 50, config.RSI_BUY,  step=1)
     rsi_sell = st.slider("RSI Sell >",  51, 90, config.RSI_SELL, step=1)
+    block_range = st.checkbox("Bloquear sinais em Range", value=config.REGIME_BLOCK_RANGE_SIGNALS)
 
     st.markdown("---")
     st.subheader("Backtest params")
-    initial_capital = st.number_input(
-        "Initial capital (USD)", value=int(config.INITIAL_CAPITAL), step=1_000
-    )
-    position_size = st.slider(
-        "Position size (%)", 1, 50, int(config.POSITION_SIZE_PCT * 100)
-    ) / 100
+    initial_capital = st.number_input("Initial capital (USD)", value=int(config.INITIAL_CAPITAL), step=1_000)
+    position_size   = st.slider("Position size (%)", 1, 50, int(config.POSITION_SIZE_PCT * 100)) / 100
     sl_mult = st.slider("Stop-loss  (x ATR)",  0.5, 5.0, config.SL_ATR_MULT, 0.5)
     tp_mult = st.slider("Take-profit (x ATR)", 1.0, 10.0, config.TP_ATR_MULT, 0.5)
 
 
-# ── Data loading — two-tier cache ─────────────────────────────────────────────
-# Tier 1: fetch OHLCV + stable indicators (MACD, BB, ATR) — cached 15 min.
-# Tier 2: signal generation — runs on every slider change (fast pandas ops).
+# ── Data loading ──────────────────────────────────────────────────────────────
+@st.cache_data(ttl=config.CACHE_TTL_SECONDS, show_spinner=False)
+def _load_indicators(tf: str) -> pd.DataFrame:
+    """Fetch OHLCV + all indicators for one timeframe. Cached 15 min."""
+    return add_all_indicators(fetch_ohlcv(timeframe=tf))
+
 
 @st.cache_data(ttl=config.CACHE_TTL_SECONDS, show_spinner=False)
-def _fetch_with_indicators(tf: str) -> pd.DataFrame:
-    df = fetch_ohlcv(timeframe=tf)
-    df = add_all_indicators(df)
-    return df
+def _load_mtf() -> dict:
+    """Fetch MTF confluence (3 yfinance calls). Cached 15 min."""
+    return get_mtf_confluence()
 
 
 if refresh:
     st.cache_data.clear()
 
-with st.spinner("Fetching latest EUR/USD data ..."):
-    base_df = _fetch_with_indicators(timeframe)
+with st.spinner("Fetching EUR/USD data..."):
+    base_df = _load_indicators(timeframe)
 
-# Signals recalculate instantly — no yfinance call, just pandas
-df = generate_signals_custom(base_df, rsi_buy=rsi_buy, rsi_sell=rsi_sell)
+# Regime detection (fast — no network)
+regime = detect_regime(base_df)
+
+# Signals: regime passed so filter can suppress Range entries
+override_regime = regime if block_range else None
+df = generate_signals_custom(base_df, rsi_buy=rsi_buy, rsi_sell=rsi_sell, regime=override_regime)
 save_ohlcv(df[["open", "high", "low", "close", "volume"]], timeframe)
 save_signals(df, timeframe)
 
-# ── Backtest ──────────────────────────────────────────────────────────────────
-result = run_backtest(
-    df,
-    initial_capital=float(initial_capital),
-    position_size_pct=position_size,
-    sl_atr_mult=sl_mult,
-    tp_atr_mult=tp_mult,
-)
+# Backtest
+result = run_backtest(df, initial_capital=float(initial_capital),
+                      position_size_pct=position_size, sl_atr_mult=sl_mult, tp_atr_mult=tp_mult)
 
-# ── KPI strip ─────────────────────────────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total Return",  f"{result.total_return:+.2f}%")
-c2.metric("Sharpe Ratio",  f"{result.sharpe_ratio:.3f}")
-c3.metric("Max Drawdown",  f"{result.max_drawdown:.2f}%")
-c4.metric("Win Rate",      f"{result.win_rate:.1f}%")
-c5.metric("Total Trades",  str(result.total_trades))
+# ── Regime + MTF row ──────────────────────────────────────────────────────────
+col_reg, col_mtf = st.columns([1, 2])
+
+with col_reg:
+    rc = regime_color(regime)
+    st.markdown(
+        f"<div style='background:{rc}22;border:1px solid {rc};border-radius:8px;"
+        f"padding:10px 16px;text-align:center'>"
+        f"<span style='font-size:1.4em'>{regime_emoji(regime)}</span>"
+        f"<br><b style='color:{rc};font-size:1.1em'>{regime}</b>"
+        f"<br><small style='color:#aaa'>ADX = {base_df['adx'].iloc[-1]:.1f}</small>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+with col_mtf:
+    with st.spinner("Calculando confluencia MTF..."):
+        mtf = _load_mtf()
+
+    _sig_label = {1: "BUY ▲", -1: "SELL ▼", 0: "HOLD —"}
+    _sig_color = {1: "#26a69a", -1: "#ef5350", 0: "#888888"}
+    c15, c1h, c4h, cconf = st.columns(4)
+    for col, tf_key, label in [(c15, "15m", "15 min"), (c1h, "1h", "1 hora"),
+                                (c4h, "4h", "4 horas"), (cconf, "confluence", "Confluencia")]:
+        sv = mtf[tf_key]
+        col.markdown(
+            f"<div style='text-align:center;padding:6px'>"
+            f"<small style='color:#aaa'>{label}</small><br>"
+            f"<b style='color:{_sig_color[sv]};font-size:1.1em'>{_sig_label[sv]}</b>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
 st.markdown("---")
 
-# ── Main chart ────────────────────────────────────────────────────────────────
-rsi_label  = f"RSI ({config.RSI_PERIOD}) — Buy<{rsi_buy} / Sell>{rsi_sell}"
-macd_label = f"MACD ({config.MACD_FAST}/{config.MACD_SLOW}/{config.MACD_SIGN})"
+# ── KPI strip ─────────────────────────────────────────────────────────────────
+k1, k2, k3, k4, k5 = st.columns(5)
+k1.metric("Total Return",  f"{result.total_return:+.2f}%")
+k2.metric("Sharpe Ratio",  f"{result.sharpe_ratio:.3f}")
+k3.metric("Max Drawdown",  f"{result.max_drawdown:.2f}%")
+k4.metric("Win Rate",      f"{result.win_rate:.1f}%")
+k5.metric("Total Trades",  str(result.total_trades))
+
+# ── Current signal score ──────────────────────────────────────────────────────
+last_score  = float(df["score"].iloc[-2]) if len(df) > 1 else 0.0
+last_signal = int(df["signal"].iloc[-2]) if len(df) > 1 else 0
+score_color = "#26a69a" if last_signal == 1 else ("#ef5350" if last_signal == -1 else "#888")
+st.markdown(
+    f"<div style='margin:4px 0 12px;padding:8px 16px;border-left:4px solid {score_color};"
+    f"background:#1e1e1e;border-radius:4px'>"
+    f"Score atual: <b style='color:{score_color};font-size:1.1em'>{last_score:.0f}/100</b> "
+    f"({'BUY' if last_signal==1 else 'SELL' if last_signal==-1 else 'HOLD'})"
+    f"</div>",
+    unsafe_allow_html=True,
+)
+
+st.markdown("---")
+
+# ── 5-panel main chart ────────────────────────────────────────────────────────
+rsi_title   = f"RSI ({config.RSI_PERIOD})  buy<{rsi_buy} / sell>{rsi_sell}"
+macd_title  = f"MACD ({config.MACD_FAST}/{config.MACD_SLOW}/{config.MACD_SIGN})"
+adx_title   = f"ADX ({config.ADX_WINDOW})  trend>={config.REGIME_ADX_TREND}"
+stoch_title = f"Stoch ({config.STOCH_K_WINDOW},{config.STOCH_SMOOTH_K},{config.STOCH_SMOOTH_D})"
 
 fig = make_subplots(
-    rows=3, cols=1,
+    rows=5, cols=1,
     shared_xaxes=True,
-    vertical_spacing=0.04,
-    row_heights=[0.60, 0.20, 0.20],
-    subplot_titles=["EUR/USD + Bollinger Bands", rsi_label, macd_label],
+    vertical_spacing=0.02,
+    row_heights=[0.42, 0.14, 0.14, 0.14, 0.16],
+    subplot_titles=["EUR/USD + Bollinger Bands", rsi_title, macd_title, adx_title, stoch_title],
 )
 
-# Candlestick
-fig.add_trace(
-    go.Candlestick(
-        x=df.index, open=df["open"], high=df["high"],
-        low=df["low"], close=df["close"], name="EUR/USD",
-        increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
-    ),
-    row=1, col=1,
-)
+# ── Row 1: Candlestick + BB + signals ─────────────────────────────────────────
+fig.add_trace(go.Candlestick(
+    x=df.index, open=df["open"], high=df["high"],
+    low=df["low"], close=df["close"], name="EUR/USD",
+    increasing_line_color="#26a69a", decreasing_line_color="#ef5350",
+), row=1, col=1)
 
-# Bollinger Bands
-for col_name, dash, fill, fillcolor in [
-    ("bb_upper", "dot",   None,       None),
-    ("bb_mid",   "solid", None,       None),
-    ("bb_lower", "dot",   "tonexty",  "rgba(100,149,237,0.07)"),
+for col_name, dash, fill, fc in [
+    ("bb_upper", "dot",   None,      None),
+    ("bb_mid",   "solid", None,      None),
+    ("bb_lower", "dot",   "tonexty", "rgba(100,149,237,0.07)"),
 ]:
-    kwargs: dict = dict(
-        x=df.index, y=df[col_name],
-        line=dict(color="rgba(100,149,237,0.55)", dash=dash, width=1),
-        name=col_name, showlegend=False,
-    )
+    kw: dict = dict(x=df.index, y=df[col_name],
+                    line=dict(color="rgba(100,149,237,0.55)", dash=dash, width=1),
+                    name=col_name, showlegend=False)
     if fill:
-        kwargs["fill"] = fill
-        kwargs["fillcolor"] = fillcolor
-    fig.add_trace(go.Scatter(**kwargs), row=1, col=1)
+        kw["fill"] = fill; kw["fillcolor"] = fc
+    fig.add_trace(go.Scatter(**kw), row=1, col=1)
 
-# Buy / sell markers
 buys  = df[df["signal"] ==  1]
 sells = df[df["signal"] == -1]
-fig.add_trace(go.Scatter(
-    x=buys.index, y=buys["low"] * 0.9997, mode="markers",
-    marker=dict(symbol="triangle-up", size=11, color="#26a69a"), name="Buy",
-), row=1, col=1)
-fig.add_trace(go.Scatter(
-    x=sells.index, y=sells["high"] * 1.0003, mode="markers",
-    marker=dict(symbol="triangle-down", size=11, color="#ef5350"), name="Sell",
-), row=1, col=1)
+fig.add_trace(go.Scatter(x=buys.index,  y=buys["low"]  * 0.9997, mode="markers",
+    marker=dict(symbol="triangle-up",   size=10, color="#26a69a"), name="Buy"),  row=1, col=1)
+fig.add_trace(go.Scatter(x=sells.index, y=sells["high"] * 1.0003, mode="markers",
+    marker=dict(symbol="triangle-down", size=10, color="#ef5350"), name="Sell"), row=1, col=1)
 
-# RSI + dynamic threshold lines
-fig.add_trace(
-    go.Scatter(x=df.index, y=df["rsi"],
-               line=dict(color="#9c27b0", width=1.5), name="RSI"),
-    row=2, col=1,
-)
+# ── Row 2: RSI ────────────────────────────────────────────────────────────────
+fig.add_trace(go.Scatter(x=df.index, y=df["rsi"],
+    line=dict(color="#9c27b0", width=1.5), name="RSI"), row=2, col=1)
 fig.add_hline(y=rsi_sell, line_color="red",   line_dash="dash", line_width=1, row=2, col=1)
 fig.add_hline(y=rsi_buy,  line_color="green", line_dash="dash", line_width=1, row=2, col=1)
 
-# MACD
+# ── Row 3: MACD ───────────────────────────────────────────────────────────────
 hist_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in df["macd_hist"]]
-fig.add_trace(
-    go.Bar(x=df.index, y=df["macd_hist"], marker_color=hist_colors,
-           name="Histogram", showlegend=False),
-    row=3, col=1,
-)
-fig.add_trace(
-    go.Scatter(x=df.index, y=df["macd"],
-               line=dict(color="#2196f3", width=1.5), name="MACD"),
-    row=3, col=1,
-)
-fig.add_trace(
-    go.Scatter(x=df.index, y=df["macd_signal"],
-               line=dict(color="#ff9800", width=1.5), name="Signal line"),
-    row=3, col=1,
-)
+fig.add_trace(go.Bar(x=df.index, y=df["macd_hist"], marker_color=hist_colors,
+    name="Hist", showlegend=False), row=3, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["macd"],
+    line=dict(color="#2196f3", width=1.5), name="MACD"), row=3, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["macd_signal"],
+    line=dict(color="#ff9800", width=1.5), name="Signal"), row=3, col=1)
+
+# ── Row 4: ADX ────────────────────────────────────────────────────────────────
+fig.add_trace(go.Scatter(x=df.index, y=df["adx"],
+    line=dict(color="#ffd600", width=1.5), name="ADX"), row=4, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["adx_pos"],
+    line=dict(color="#26a69a", width=1, dash="dot"), name="+DI"), row=4, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["adx_neg"],
+    line=dict(color="#ef5350", width=1, dash="dot"), name="-DI"), row=4, col=1)
+fig.add_hline(y=config.REGIME_ADX_TREND, line_color="white",
+    line_dash="dash", line_width=1, row=4, col=1)
+
+# ── Row 5: Stochastic ─────────────────────────────────────────────────────────
+fig.add_trace(go.Scatter(x=df.index, y=df["stoch_k"],
+    line=dict(color="#00bcd4", width=1.5), name="%K"), row=5, col=1)
+fig.add_trace(go.Scatter(x=df.index, y=df["stoch_d"],
+    line=dict(color="#ff9800", width=1.5), name="%D"), row=5, col=1)
+fig.add_hline(y=config.STOCH_OVERBOUGHT, line_color="red",   line_dash="dash", line_width=1, row=5, col=1)
+fig.add_hline(y=config.STOCH_OVERSOLD,   line_color="green", line_dash="dash", line_width=1, row=5, col=1)
 
 fig.update_layout(
-    height=820,
+    height=950,
     template="plotly_dark",
     xaxis_rangeslider_visible=False,
-    legend=dict(orientation="h", y=1.04, x=0),
+    legend=dict(orientation="h", y=1.03, x=0),
     margin=dict(l=0, r=0, t=40, b=0),
 )
 fig.update_yaxes(range=[0, 100], row=2, col=1)
+fig.update_yaxes(range=[0, 100], row=5, col=1)
 
 st.plotly_chart(fig, use_container_width=True)
 
@@ -188,15 +231,12 @@ st.plotly_chart(fig, use_container_width=True)
 st.subheader("Equity Curve")
 eq = result.equity_curve
 eq_fig = go.Figure(go.Scatter(
-    x=eq.index, y=eq.values,
-    fill="tozeroy", fillcolor="rgba(38,166,154,0.12)",
+    x=eq.index, y=eq.values, fill="tozeroy",
+    fillcolor="rgba(38,166,154,0.12)",
     line=dict(color="#26a69a", width=2), name="Equity",
 ))
-eq_fig.update_layout(
-    template="plotly_dark", height=220,
-    margin=dict(l=0, r=0, t=10, b=0),
-    yaxis_title="Capital (USD)",
-)
+eq_fig.update_layout(template="plotly_dark", height=200,
+    margin=dict(l=0, r=0, t=10, b=0), yaxis_title="Capital (USD)")
 st.plotly_chart(eq_fig, use_container_width=True)
 
 # ── Trade log ─────────────────────────────────────────────────────────────────
