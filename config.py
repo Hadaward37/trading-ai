@@ -7,7 +7,12 @@ All optimised parameters sourced from grid search (2026-05-04):
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ROOT_DIR = Path(__file__).parent
 
@@ -41,5 +46,15 @@ POSITION_SIZE_PCT = 0.10
 SL_ATR_MULT       = 2.5   # stop-loss  distance in ATR multiples
 TP_ATR_MULT       = 4.0   # take-profit distance in ATR multiples
 
-# ── Dashboard ────────────────────────────────────────────────────────────────
+# ── Dashboard ─────────────────────────────────────────────────────────────────
 CACHE_TTL_SECONDS = 900   # market-data cache lifetime (15 min)
+
+# ── Telegram alerts ───────────────────────────────────────────────────────────
+# Set these in a .env file (copy .env.example -> .env and fill in the values).
+# Get a bot token from @BotFather and your chat_id from @userinfobot.
+TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID:   str = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+SCHEDULER_INTERVAL_MIN = 15        # how often to poll for new signals
+SCHEDULER_TIMEFRAME    = "1h"      # timeframe watched by the scheduler
