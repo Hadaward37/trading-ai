@@ -60,7 +60,7 @@ def load_ohlcv(
             index_col="datetime",
             parse_dates=["datetime"],
         )
-        logger.info("Loaded %d rows ← '%s'", len(df), table)
+        logger.info("Loaded %d rows from '%s'", len(df), table)
         return df
     except Exception as exc:
         logger.warning("Table '%s' not found: %s", table, exc)
