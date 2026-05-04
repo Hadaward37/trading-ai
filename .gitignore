@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .env
+*.whl
 data/trading.db
 data/raw/
 data/processed/
