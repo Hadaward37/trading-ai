@@ -10,18 +10,18 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 
-# Allow relative imports regardless of working directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import config
 from core.backtest import run_backtest
 from core.collector import fetch_ohlcv
 from core.indicators import add_all_indicators
-from core.signals import generate_signals
+from core.signals import generate_signals_custom
 from db.database import save_ohlcv, save_signals
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Trading AI — EUR/USD",
+    page_title="Trading AI - EUR/USD",
     page_icon="📈",
     layout="wide",
 )
@@ -31,36 +31,53 @@ st.title("📈 Trading AI — EUR/USD")
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    timeframe = st.selectbox("Timeframe", ["1h", "15m"], index=0)
+    timeframe = st.selectbox("Timeframe", list(config.TIMEFRAMES), index=0)
+
     st.markdown("---")
     refresh = st.button("🔄 Refresh market data", use_container_width=True)
-    st.caption("Data is cached for 15 min to respect rate limits.")
+    st.caption("Market data cached 15 min to respect rate limits.")
+
+    st.markdown("---")
+    st.subheader("Strategy params")
+    st.caption("Optimised via grid search (Sharpe 1.494)")
+    rsi_buy  = st.slider("RSI Buy  <",  10, 50, config.RSI_BUY,  step=1)
+    rsi_sell = st.slider("RSI Sell >",  51, 90, config.RSI_SELL, step=1)
 
     st.markdown("---")
     st.subheader("Backtest params")
-    initial_capital = st.number_input("Initial capital (USD)", value=10_000, step=1_000)
-    position_size   = st.slider("Position size (%)", 1, 50, 10) / 100
-    sl_mult         = st.slider("Stop-loss (× ATR)", 0.5, 5.0, 1.5, 0.5)
-    tp_mult         = st.slider("Take-profit (× ATR)", 1.0, 10.0, 3.0, 0.5)
+    initial_capital = st.number_input(
+        "Initial capital (USD)", value=int(config.INITIAL_CAPITAL), step=1_000
+    )
+    position_size = st.slider(
+        "Position size (%)", 1, 50, int(config.POSITION_SIZE_PCT * 100)
+    ) / 100
+    sl_mult = st.slider("Stop-loss  (x ATR)",  0.5, 5.0, config.SL_ATR_MULT, 0.5)
+    tp_mult = st.slider("Take-profit (x ATR)", 1.0, 10.0, config.TP_ATR_MULT, 0.5)
 
 
-# ── Data loading ──────────────────────────────────────────────────────────────
-@st.cache_data(ttl=900, show_spinner=False)
-def _load(tf: str) -> pd.DataFrame:
+# ── Data loading — two-tier cache ─────────────────────────────────────────────
+# Tier 1: fetch OHLCV + stable indicators (MACD, BB, ATR) — cached 15 min.
+# Tier 2: signal generation — runs on every slider change (fast pandas ops).
+
+@st.cache_data(ttl=config.CACHE_TTL_SECONDS, show_spinner=False)
+def _fetch_with_indicators(tf: str) -> pd.DataFrame:
     df = fetch_ohlcv(timeframe=tf)
     df = add_all_indicators(df)
-    df = generate_signals(df)
-    save_ohlcv(df[["open", "high", "low", "close", "volume"]], tf)
-    save_signals(df, tf)
     return df
 
 
 if refresh:
     st.cache_data.clear()
 
-with st.spinner("Fetching latest EUR/USD data …"):
-    df = _load(timeframe)
+with st.spinner("Fetching latest EUR/USD data ..."):
+    base_df = _fetch_with_indicators(timeframe)
 
+# Signals recalculate instantly — no yfinance call, just pandas
+df = generate_signals_custom(base_df, rsi_buy=rsi_buy, rsi_sell=rsi_sell)
+save_ohlcv(df[["open", "high", "low", "close", "volume"]], timeframe)
+save_signals(df, timeframe)
+
+# ── Backtest ──────────────────────────────────────────────────────────────────
 result = run_backtest(
     df,
     initial_capital=float(initial_capital),
@@ -80,12 +97,15 @@ c5.metric("Total Trades",  str(result.total_trades))
 st.markdown("---")
 
 # ── Main chart ────────────────────────────────────────────────────────────────
+rsi_label  = f"RSI ({config.RSI_PERIOD}) — Buy<{rsi_buy} / Sell>{rsi_sell}"
+macd_label = f"MACD ({config.MACD_FAST}/{config.MACD_SLOW}/{config.MACD_SIGN})"
+
 fig = make_subplots(
     rows=3, cols=1,
     shared_xaxes=True,
     vertical_spacing=0.04,
     row_heights=[0.60, 0.20, 0.20],
-    subplot_titles=["EUR/USD + Bollinger Bands", "RSI (14)", "MACD (12 / 26 / 9)"],
+    subplot_titles=["EUR/USD + Bollinger Bands", rsi_label, macd_label],
 )
 
 # Candlestick
@@ -98,13 +118,12 @@ fig.add_trace(
     row=1, col=1,
 )
 
-# Bollinger Bands — upper / mid / lower with shaded fill
-bb_style = [
+# Bollinger Bands
+for col_name, dash, fill, fillcolor in [
     ("bb_upper", "dot",   None,       None),
     ("bb_mid",   "solid", None,       None),
     ("bb_lower", "dot",   "tonexty",  "rgba(100,149,237,0.07)"),
-]
-for col_name, dash, fill, fillcolor in bb_style:
+]:
     kwargs: dict = dict(
         x=df.index, y=df[col_name],
         line=dict(color="rgba(100,149,237,0.55)", dash=dash, width=1),
@@ -115,7 +134,7 @@ for col_name, dash, fill, fillcolor in bb_style:
         kwargs["fillcolor"] = fillcolor
     fig.add_trace(go.Scatter(**kwargs), row=1, col=1)
 
-# Buy / sell signal markers
+# Buy / sell markers
 buys  = df[df["signal"] ==  1]
 sells = df[df["signal"] == -1]
 fig.add_trace(go.Scatter(
@@ -127,13 +146,14 @@ fig.add_trace(go.Scatter(
     marker=dict(symbol="triangle-down", size=11, color="#ef5350"), name="Sell",
 ), row=1, col=1)
 
-# RSI
+# RSI + dynamic threshold lines
 fig.add_trace(
-    go.Scatter(x=df.index, y=df["rsi"], line=dict(color="#9c27b0", width=1.5), name="RSI"),
+    go.Scatter(x=df.index, y=df["rsi"],
+               line=dict(color="#9c27b0", width=1.5), name="RSI"),
     row=2, col=1,
 )
-for level, color in [(70, "red"), (30, "green")]:
-    fig.add_hline(y=level, line_color=color, line_dash="dash", line_width=1, row=2, col=1)
+fig.add_hline(y=rsi_sell, line_color="red",   line_dash="dash", line_width=1, row=2, col=1)
+fig.add_hline(y=rsi_buy,  line_color="green", line_dash="dash", line_width=1, row=2, col=1)
 
 # MACD
 hist_colors = ["#26a69a" if v >= 0 else "#ef5350" for v in df["macd_hist"]]
@@ -186,4 +206,4 @@ if not result.trades.empty:
     display["pnl"] = display["pnl"].map(lambda x: f"${x:+.4f}")
     st.dataframe(display, use_container_width=True, hide_index=True)
 else:
-    st.info("No trades generated for this timeframe / parameter set.")
+    st.info("No trades generated for this parameter set.")

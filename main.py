@@ -11,9 +11,11 @@ import argparse
 import logging
 import sys
 
+import config
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     stream=sys.stdout,
 )
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_pipeline(timeframe: str) -> None:
-    """Fetch → indicators → signals → backtest → persist."""
+    """Fetch -> indicators -> signals -> backtest -> persist."""
     from core.backtest import run_backtest
     from core.collector import fetch_ohlcv
     from core.indicators import add_all_indicators
@@ -30,6 +32,11 @@ def run_pipeline(timeframe: str) -> None:
     from db.database import save_ohlcv, save_signals
 
     logger.info("Starting pipeline | timeframe=%s", timeframe)
+    logger.info(
+        "Config: RSI(%d) Buy<%d Sell>%d | SL=%.1fx TP=%.1fx ATR",
+        config.RSI_PERIOD, config.RSI_BUY, config.RSI_SELL,
+        config.SL_ATR_MULT, config.TP_ATR_MULT,
+    )
 
     df = fetch_ohlcv(timeframe=timeframe)
     df = add_all_indicators(df)
@@ -38,7 +45,13 @@ def run_pipeline(timeframe: str) -> None:
     save_ohlcv(df[["open", "high", "low", "close", "volume"]], timeframe)
     save_signals(df, timeframe)
 
-    result = run_backtest(df)
+    result = run_backtest(
+        df,
+        initial_capital=config.INITIAL_CAPITAL,
+        position_size_pct=config.POSITION_SIZE_PCT,
+        sl_atr_mult=config.SL_ATR_MULT,
+        tp_atr_mult=config.TP_ATR_MULT,
+    )
 
     logger.info(
         "Pipeline done | return=%.2f%% sharpe=%.3f max_dd=%.2f%% "
@@ -49,6 +62,8 @@ def run_pipeline(timeframe: str) -> None:
 
     print("\n--- Backtest Results ----------------------------")
     print(f"  Timeframe    : {timeframe}")
+    print(f"  RSI          : period={config.RSI_PERIOD} buy<{config.RSI_BUY} sell>{config.RSI_SELL}")
+    print(f"  SL / TP      : {config.SL_ATR_MULT}x / {config.TP_ATR_MULT}x ATR")
     print(f"  Total Return : {result.total_return:+.2f}%")
     print(f"  Sharpe Ratio : {result.sharpe_ratio:.3f}")
     print(f"  Max Drawdown : {result.max_drawdown:.2f}%")
@@ -57,12 +72,12 @@ def run_pipeline(timeframe: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Trading AI — EUR/USD Pipeline")
+    parser = argparse.ArgumentParser(description="Trading AI - EUR/USD Pipeline")
     parser.add_argument(
         "--timeframe",
-        choices=["15m", "1h"],
-        default="1h",
-        help="Candle interval (default: 1h)",
+        choices=list(config.TIMEFRAMES),
+        default=config.DEFAULT_TF,
+        help=f"Candle interval (default: {config.DEFAULT_TF})",
     )
     args = parser.parse_args()
     run_pipeline(args.timeframe)
