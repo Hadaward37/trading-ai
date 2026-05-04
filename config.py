@@ -1,8 +1,10 @@
 """Centralised project configuration.
 
-Optimised parameters from grid search (2026-05-04):
-  RSI(14) | Buy < 30 | Sell > 75 | SL 2.5x ATR | TP 4.0x ATR
-  -> Sharpe 1.494 | Win Rate 45.2% | Max DD -0.42% (timeframe 1h)
+Re-optimised parameters (2026-05-04, v2 — ADX + Stochastic filters):
+  RSI(14) | Buy < 35 | Sell > 75 | SL 2.5x ATR | TP 4.0x ATR
+  ADX Trend threshold = 25 | Stoch Oversold < 25
+  -> Sharpe 1.299 | Win Rate 47.2% | Max DD -0.50% | 212 trades (1h)
+  (v1 no-filter baseline: Sharpe 1.494, Win Rate 45.2%, 425 trades)
 """
 
 from __future__ import annotations
@@ -22,9 +24,9 @@ TIMEFRAMES  = ("15m", "1h", "4h")   # 4h is resampled from 1h internally
 DEFAULT_TF  = "1h"
 DB_PATH     = ROOT_DIR / "data" / "trading.db"
 
-# ── RSI  (optimised — grid search 2026-05-04) ─────────────────────────────────
+# ── RSI  (re-optimised — v2 with ADX + Stoch filters) ────────────────────────
 RSI_PERIOD = 14
-RSI_BUY    = 30
+RSI_BUY    = 35   # raised from 30 (v1) — better Win Rate with stoch filter
 RSI_SELL   = 75
 
 # ── MACD ──────────────────────────────────────────────────────────────────────
@@ -47,8 +49,8 @@ ADX_WINDOW = 14
 STOCH_K_WINDOW   = 14
 STOCH_SMOOTH_K   = 3
 STOCH_SMOOTH_D   = 3
-STOCH_OVERSOLD   = 20
-STOCH_OVERBOUGHT = 80
+STOCH_OVERSOLD   = 25   # raised from 20 (v1) — allows slightly more signals
+STOCH_OVERBOUGHT = 75   # symmetric with oversold
 
 # ── Market Regime ─────────────────────────────────────────────────────────────
 REGIME_ADX_TREND            = 25    # ADX >= this -> trending
