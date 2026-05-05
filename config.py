@@ -21,8 +21,13 @@ load_dotenv()
 
 ROOT_DIR = Path(__file__).parent
 
+# ── MetaTrader 5 integration ──────────────────────────────────────────────────
+USE_MT5        = True              # True = use MT5 terminal for EURUSD data
+MT5_SYMBOL     = "EURUSD"          # MT5 symbol name (no "=X" suffix)
+MT5_TIMEOUT_MS = 60_000            # connection timeout in milliseconds
+
 # ── Data source ───────────────────────────────────────────────────────────────
-SYMBOL      = "EURUSD=X"            # default / backward-compat
+SYMBOL      = "EURUSD=X"            # default / backward-compat (yfinance)
 TIMEFRAMES  = ("15m", "1h", "4h")   # 4h is resampled from 1h internally
 DEFAULT_TF  = "1h"
 DB_PATH     = ROOT_DIR / "data" / "trading.db"
