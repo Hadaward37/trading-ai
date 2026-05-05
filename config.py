@@ -113,3 +113,13 @@ NEWS_FILTER_ENABLED        = True
 NEWS_FILTER_WINDOW_MINUTES = 30          # block N min before AND after event
 NEWS_CACHE_TTL_SECONDS     = 3600        # refresh calendar at most once per hour
 NEWS_FILTER_CURRENCIES     = ("USD", "EUR", "BRL")  # currencies whose events block signals
+
+# ── News Intelligence — Phase 2 (Gemini + GPT-4o) ────────────────────────────
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+GROQ_API_KEY:   str = os.getenv("GROQ_API_KEY", "")
+GEMINI_MODEL              = "gemini-2.0-flash"          # ajuste conforme quota disponível
+GROQ_MODEL                = "llama-3.3-70b-versatile"   # free tier: 14400 req/dia
+NEWS_INTELLIGENCE_ENABLED     = True    # master switch
+NEWS_INTELLIGENCE_TTL_SECONDS = 300     # cache per-ticker — 5 minutes
+SENTIMENT_SCORE_WEIGHT        = 15      # max pts added/removed from technical score

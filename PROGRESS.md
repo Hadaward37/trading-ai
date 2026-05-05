@@ -54,6 +54,18 @@
 - [x] Ações brasileiras — `config.ASSETS` (VALE3, PETR4, ITUB4, BBDC4, IBOV via yfinance)
 - [x] Integração TradingView / Pine Script — `tradingview/strategy.pine` + `tradingview/indicator.pine`
 
+### ✅ Fase 2 — Inteligência de Notícias (concluída 2026-05-05)
+- [x] **Groq API (Llama 3.3 70B)** — análise de sentimento gratuita (14.400 req/dia)
+- [x] **Pipeline completo**: Yahoo Finance RSS coleta → Groq classifica → score integrado
+- [x] **Output estruturado**: `sentiment` (BULLISH/BEARISH/NEUTRAL) · `confidence` · `impact` · `key_factors`
+- [x] **final_score**: score técnico ±15 pts conforme alinhamento sentimento × sinal
+- [x] **Fallback inteligente**: keyword-based quando API indisponível
+- [x] **Sentimento no Telegram**: alerta inclui sentimento + confiança + impacto
+- [x] **Cache por ticker**: TTL 5 min (evita chamadas excessivas de API)
+
+> **Nota:** GPT-4o e Gemini pendentes de créditos — Groq substituindo gratuitamente com qualidade equivalente.
+> Prioridade de engines: GPT-4o → Groq → Gemini → keyword fallback
+
 ## Estrutura do Projeto
 ```
 trading-ai/
@@ -63,12 +75,14 @@ trading-ai/
 ├── core/
 │   ├── collector.py        # yfinance + resample 4H + MTF confluence
 │   ├── indicators.py       # RSI, MACD, BB, ATR, ADX, Stoch
-│   ├── signals.py          # Votação 2/3 + score 0-100 + regime filter
+│   ├── signals.py          # Votação 2/3 + score 0-100 + sentiment final_score
 │   ├── regime.py           # Detecção de regime de mercado
 │   ├── backtest.py         # Engine de backtest vetorizado
 │   ├── optimizer.py        # Grid search v2 (ADX + Stoch)
-│   ├── notifier.py         # TelegramNotifier
-│   └── scheduler.py        # Loop 15min, anti-spam
+│   ├── news_filter.py      # Filtro ForexFactory (bloqueia FOMC/NFP/CPI)
+│   ├── news_intelligence.py# Fase 2: RSS + Groq/GPT/Gemini → sentimento
+│   ├── notifier.py         # TelegramNotifier (inclui sentimento)
+│   └── scheduler.py        # Loop 15min, anti-spam, multi-asset
 ├── db/
 │   └── database.py         # SQLAlchemy + SQLite
 ├── dashboard/
@@ -78,7 +92,7 @@ trading-ai/
 ├── data/
 │   ├── trading.db          # SQLite (gitignored)
 │   └── optimization_results.csv
-├── .env                    # Telegram credentials (gitignored)
+├── .env                    # Credenciais (gitignored)
 └── .env.example
 ```
 
@@ -103,9 +117,27 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 ```
 
 ## Próximos Passos
-1. **Optimizer por ativo** — rodar grid search separado para VALE3/PETR4 (parâmetros diferentes do Forex)
-2. **DB multi-asset** — schema SQLite para salvar sinais de todos os ativos
-3. **Paper trading** — integrar broker demo (MetaTrader via MT5 ou OANDA API)
+
+### Fase 3 — Validação de Risco com Claude API
+- [ ] Claude API como validador antes de cada sinal
+- [ ] Checagem: "dado o contexto macro, essa operação é segura?"
+- [ ] Relatório diário automático de performance
+- [ ] Sugestão de ajustes na estratégia via Claude
+
+### Fase 4 — Arquitetura Multi-Agente Completa
+- [ ] Groq/GPT-4o → sentimento estruturado em JSON
+- [ ] Sistema Python → cruza técnico + sentimento
+- [ ] Claude → valida risco final
+- [ ] Sinal final → Telegram + TradingView
+
+### Fase 5 — Paper Trading e Validação
+- [ ] Diário de operações automático
+- [ ] Comparar sinais vs resultado real do mercado
+- [ ] Meta: 2-3 meses de paper trading consistente
+
+### Fase 6 — Servidor 24/7
+- [ ] Migrar para Oracle Cloud ou Railway
+- [ ] Sistema rodando sem depender do Samsung
 
 ## Como Retomar
 Ao iniciar nova conversa com Claude, cole:

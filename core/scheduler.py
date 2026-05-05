@@ -94,6 +94,10 @@ def _build_alert(df, win_rate: float, symbol: str) -> SignalAlert:
         atr         = round(atr, d),
         flag        = meta["flag"],
         decimals    = d,
+        sentiment             = str(row.get("sentiment", "NEUTRAL")),
+        sentiment_confidence  = float(row.get("sentiment_confidence", 0.0)),
+        sentiment_impact      = str(row.get("sentiment_impact", "LOW")),
+        final_score           = float(row.get("final_score", row.get("score", 0.0))),
     )
 
 
@@ -112,11 +116,16 @@ def _run_asset(
     name = meta["name"]
 
     try:
+        ticker_name = config.ASSET_META.get(symbol, {}).get("name", symbol)
+
         df = fetch_ohlcv(timeframe=config.SCHEDULER_TIMEFRAME, symbol=symbol)
         df = add_all_indicators(df)
         # check_news=False here — we do the news check manually below so we can
         # send a meaningful blocked message rather than just silently returning 0
-        df = generate_signals_custom(df, config.RSI_BUY, config.RSI_SELL, check_news=False)
+        df = generate_signals_custom(
+            df, config.RSI_BUY, config.RSI_SELL,
+            check_news=False, check_sentiment=True, ticker=ticker_name,
+        )
 
         # Only save DB records for the default asset to avoid schema complexity
         if symbol == config.SYMBOL:

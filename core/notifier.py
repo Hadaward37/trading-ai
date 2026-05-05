@@ -14,6 +14,9 @@ _TELEGRAM_API = "https://api.telegram.org/bot{token}/sendMessage"
 _SIGNAL_EMOJI = {"BUY": "🟢", "SELL": "🔴", "HOLD": "⚪"}
 
 
+_SENTIMENT_EMOJI = {"BULLISH": "📰🟢", "BEARISH": "📰🔴", "NEUTRAL": "📰⚪"}
+
+
 @dataclass
 class SignalAlert:
     """All data needed to render one trading alert message."""
@@ -28,8 +31,12 @@ class SignalAlert:
     confidence:  int    # 1..3 — how many indicators agreed
     rsi:         float
     atr:         float
-    flag:        str = "📊"   # flag emoji from ASSET_META
-    decimals:    int = 5      # price decimal places (5=forex, 2=stocks, 0=index)
+    flag:          str   = "📊"     # flag emoji from ASSET_META
+    decimals:      int   = 5        # price decimal places (5=forex, 2=stocks, 0=index)
+    sentiment:     str   = "NEUTRAL"   # BULLISH | BEARISH | NEUTRAL
+    sentiment_confidence: float = 0.0  # 0.0–1.0
+    sentiment_impact:     str   = "LOW"
+    final_score:   float = 0.0         # sentiment-adjusted score
 
 
 class TelegramNotifier:
@@ -88,6 +95,10 @@ class TelegramNotifier:
         sl_sign = "-" if a.signal == "BUY" else "+"
         tp_sign = "+" if a.signal == "BUY" else "-"
 
+        sent_emoji = _SENTIMENT_EMOJI.get(a.sentiment, "📰⚪")
+        sent_conf  = int(a.sentiment_confidence * 100)
+        score_str  = f"`{a.final_score:.0f}/100`" if a.final_score > 0 else "`—`"
+
         lines = [
             f"{emoji} {a.flag} *{a.signal} — {a.asset}*",
             "",
@@ -102,6 +113,9 @@ class TelegramNotifier:
             "",
             f"🏆 *Win Rate hist:* `{a.win_rate:.1f}%`",
             f"💡 *Confianca:*    `{conf_bar}` {conf_pct}% ({a.confidence}/3 indicadores)",
+            f"🔢 *Score final:*  {score_str}",
+            "",
+            f"{sent_emoji} *Sentimento:*   `{a.sentiment}` ({sent_conf}% conf · {a.sentiment_impact})",
         ]
         return "\n".join(lines)
 

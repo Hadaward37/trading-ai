@@ -93,13 +93,17 @@ def _score_series(
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def generate_signals(df: pd.DataFrame) -> pd.DataFrame:
+def generate_signals(df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
     """Generate signals using defaults from ``config``.
 
     Convenience wrapper around :func:`generate_signals_custom` with news
-    filtering enabled (used by the live scheduler and dashboard).
+    filtering and sentiment analysis enabled (used by the live scheduler and
+    dashboard).  Pass *ticker* (e.g. ``"EUR/USD"``) to enable sentiment.
     """
-    return generate_signals_custom(df, config.RSI_BUY, config.RSI_SELL, check_news=True)
+    return generate_signals_custom(
+        df, config.RSI_BUY, config.RSI_SELL,
+        check_news=True, check_sentiment=True, ticker=ticker,
+    )
 
 
 def generate_signals_custom(
@@ -108,6 +112,8 @@ def generate_signals_custom(
     rsi_sell: int,
     regime: Optional[str] = None,
     check_news: bool = False,
+    check_sentiment: bool = False,
+    ticker: str = "",
 ) -> pd.DataFrame:
     """Add ``signal`` (1/-1/0) and ``score`` (0-100) columns to *df*.
 
@@ -120,20 +126,26 @@ def generate_signals_custom(
     RSI {rsi_w}% + MACD {macd_w}% + BB {bb_w}% + ADX {adx_w}% + Stoch {stoch_w}%
 
     Args:
-        df: DataFrame with all indicator columns (from
-            :func:`core.indicators.add_all_indicators`).
-        rsi_buy:    Buy threshold (RSI below this counts as oversold vote).
-        rsi_sell:   Sell threshold (RSI above this counts as overbought vote).
-        regime:     Current market regime string. When
-            :data:`config.REGIME_BLOCK_RANGE_SIGNALS` is True and regime is
-            ``"Range"``, all signals are suppressed.
-        check_news: When True, call :func:`core.news_filter.is_danger_zone`
-            and suppress signals near high-impact economic events.
-            Disabled by default so the optimizer/backtest are unaffected.
+        df:               DataFrame with all indicator columns (from
+                          :func:`core.indicators.add_all_indicators`).
+        rsi_buy:          Buy threshold (RSI below this counts as oversold vote).
+        rsi_sell:         Sell threshold (RSI above this counts as overbought vote).
+        regime:           Current market regime string. When
+                          :data:`config.REGIME_BLOCK_RANGE_SIGNALS` is True and
+                          regime is ``"Range"``, all signals are suppressed.
+        check_news:       When True, call :func:`core.news_filter.is_danger_zone`
+                          and suppress signals near high-impact economic events.
+                          Disabled by default so the optimizer/backtest are unaffected.
+        check_sentiment:  When True, call
+                          :func:`core.news_intelligence.get_market_sentiment` and
+                          adjust ``final_score`` based on Gemini+GPT-4o analysis.
+                          Disabled by default so the optimizer/backtest are unaffected.
+        ticker:           Asset name passed to the sentiment pipeline (e.g. ``"EUR/USD"``).
 
     Returns:
-        Copy of *df* with ``signal``, ``score``, ``news_blocked``, and
-        ``news_reason`` columns appended.
+        Copy of *df* with ``signal``, ``score``, ``news_blocked``, ``news_reason``,
+        ``sentiment``, ``sentiment_confidence``, ``sentiment_impact``, and
+        ``final_score`` columns appended.
     """.format(
         rsi_w=config.SCORE_WEIGHT_RSI, macd_w=config.SCORE_WEIGHT_MACD,
         bb_w=config.SCORE_WEIGHT_BB,   adx_w=config.SCORE_WEIGHT_ADX,
@@ -170,5 +182,28 @@ def generate_signals_custom(
             df["score"]        = 0.0
             df["news_blocked"] = True
             df["news_reason"]  = reason
+
+    # ── Sentiment analysis (Phase 2) ──────────────────────────────────────────
+    df["sentiment"]            = "NEUTRAL"
+    df["sentiment_confidence"] = 0.0
+    df["sentiment_impact"]     = "LOW"
+    df["final_score"]          = df["score"]
+
+    if check_sentiment and config.NEWS_INTELLIGENCE_ENABLED:
+        from core.news_intelligence import get_market_sentiment  # lazy import
+        analysis = get_market_sentiment(ticker)
+        df["sentiment"]            = analysis.sentiment
+        df["sentiment_confidence"] = analysis.confidence
+        df["sentiment_impact"]     = analysis.impact
+
+        # Adjust final_score for bars where a signal fired
+        signal_mask = df["signal"] != 0
+        if signal_mask.any():
+            adjustments = df.loc[signal_mask, "signal"].apply(
+                lambda s: analysis.score_adjustment(int(s))
+            )
+            df.loc[signal_mask, "final_score"] = (
+                df.loc[signal_mask, "score"] + adjustments
+            ).clip(0, 100).round(1)
 
     return df
