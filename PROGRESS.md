@@ -66,33 +66,47 @@
 > **Nota:** GPT-4o e Gemini pendentes de créditos — Groq substituindo gratuitamente com qualidade equivalente.
 > Prioridade de engines: GPT-4o → Groq → Gemini → keyword fallback
 
+### 🚀 Fase 5 — Paper Trading e Validação (iniciada 2026-05-05)
+- [x] **Paper trading implementado** — `core/paper_trading.py` com SQLite WAL
+- [x] **Carteira virtual R$ 10.000** — posição 10% do capital por trade
+- [x] **SL/TP automático** — monitorado a cada ciclo do scheduler (15 min)
+- [x] **Diário automático** — `core/trade_journal.py` + CSV diário em `data/journal/`
+- [x] **Dashboard aba Paper Trading** — KPIs, posições abertas, gráfico saldo, histórico
+- [x] **Alertas Telegram** — notifica quando TP ou SL é atingido com P&L
+- [ ] **Meta: 50–100 trades** para validação estatística
+- [ ] Comparar sinais vs resultado real do mercado
+- [ ] Ajuste de parâmetros baseado em performance real
+
 ## Estrutura do Projeto
 ```
 trading-ai/
-├── config.py               # Todos os parâmetros centralizados
-├── main.py                 # CLI: python main.py --timeframe 1h
-├── run_scheduler.py        # Bot Telegram: python run_scheduler.py
+├── config.py                # Todos os parâmetros centralizados
+├── main.py                  # CLI: python main.py --timeframe 1h
+├── run_scheduler.py         # Bot Telegram: python run_scheduler.py
 ├── core/
-│   ├── collector.py        # yfinance + resample 4H + MTF confluence
-│   ├── indicators.py       # RSI, MACD, BB, ATR, ADX, Stoch
-│   ├── signals.py          # Votação 2/3 + score 0-100 + sentiment final_score
-│   ├── regime.py           # Detecção de regime de mercado
-│   ├── backtest.py         # Engine de backtest vetorizado
-│   ├── optimizer.py        # Grid search v2 (ADX + Stoch)
-│   ├── news_filter.py      # Filtro ForexFactory (bloqueia FOMC/NFP/CPI)
-│   ├── news_intelligence.py# Fase 2: RSS + Groq/GPT/Gemini → sentimento
-│   ├── notifier.py         # TelegramNotifier (inclui sentimento)
-│   └── scheduler.py        # Loop 15min, anti-spam, multi-asset
+│   ├── collector.py         # yfinance + resample 4H + MTF confluence
+│   ├── indicators.py        # RSI, MACD, BB, ATR, ADX, Stoch
+│   ├── signals.py           # Votação 2/3 + score 0-100 + sentiment final_score
+│   ├── regime.py            # Detecção de regime de mercado
+│   ├── backtest.py          # Engine de backtest vetorizado
+│   ├── optimizer.py         # Grid search v2 (ADX + Stoch)
+│   ├── news_filter.py       # Filtro ForexFactory (bloqueia FOMC/NFP/CPI)
+│   ├── news_intelligence.py # Fase 2: RSS + Groq/GPT/Gemini → sentimento
+│   ├── paper_trading.py     # Fase 5: carteira virtual, SL/TP, métricas
+│   ├── trade_journal.py     # Fase 5: CSV diário, resumo do dia
+│   ├── notifier.py          # TelegramNotifier (inclui sentimento)
+│   └── scheduler.py         # Loop 15min, paper trading integrado
 ├── db/
-│   └── database.py         # SQLAlchemy + SQLite
+│   └── database.py          # SQLAlchemy + SQLite
 ├── dashboard/
-│   └── app.py              # Streamlit 5-painéis + regime + MTF
+│   └── app.py               # Streamlit — Sinais + Paper Trading (2 abas)
 ├── tests/
-│   └── test_indicators.py  # pytest (6/6 passing)
+│   └── test_indicators.py   # pytest (6/6 passing)
 ├── data/
-│   ├── trading.db          # SQLite (gitignored)
+│   ├── trading.db           # SQLite (gitignored)
+│   ├── journal/             # CSVs diários (gitignored)
 │   └── optimization_results.csv
-├── .env                    # Credenciais (gitignored)
+├── .env                     # Credenciais (gitignored)
 └── .env.example
 ```
 
