@@ -24,6 +24,20 @@
 
 > v1 baseline (sem filtros): Sharpe 1.494 · Win Rate 45.2% · 425 trades
 
+### Alternativa Interessante — #3 (maior Win Rate)
+| Parâmetro | Valor |
+|-----------|-------|
+| RSI Buy < | 30 |
+| RSI Sell > | 75 |
+| Stop Loss | 2.5× ATR |
+| Take Profit | 3.0× ATR |
+| ADX Threshold | 20 |
+| Stoch Oversold | 25 |
+| **Win Rate** | **52.7%** |
+| **Trades** | **205** |
+
+> Opção conservadora: menor TP (3.0×) e ADX mais permissivo (20) resultam em win rate mais alto às custas de menor Sharpe. Considerar para perfis avessos a drawdown.
+
 ## Módulos Implementados
 - [x] Coleta OHLCV — `core/collector.py` (yfinance, 15m/1H/4H)
 - [x] Indicadores — `core/indicators.py` (RSI, MACD, BB, ATR, ADX, Estocástico)
