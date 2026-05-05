@@ -199,6 +199,6 @@ if sell_signal
 // Alertas
 // =============================================================================
 
-alertcondition(buy_signal,  "Trading AI -- BUY",  "BUY | {{ticker}} | {{close}} | Score: " + str.tostring(buy_score) + "/5")
-alertcondition(sell_signal, "Trading AI -- SELL", "SELL | {{ticker}} | {{close}} | Score: " + str.tostring(sell_score) + "/5")
-alertcondition(buy_signal or sell_signal, "Trading AI -- Qualquer Sinal", "Sinal em {{ticker}} | {{close}}")
+alertcondition(buy_signal,  "Trading AI -- BUY",            "BUY | {{ticker}} | Preco: {{close}}")
+alertcondition(sell_signal, "Trading AI -- SELL",           "SELL | {{ticker}} | Preco: {{close}}")
+alertcondition(buy_signal or sell_signal, "Trading AI -- Qualquer Sinal", "Sinal em {{ticker}} | Preco: {{close}}")
