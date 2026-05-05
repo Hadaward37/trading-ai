@@ -1,71 +1,42 @@
 // This Pine Script code is subject to the terms of the Mozilla Public License 2.0
 // (c) Trading AI -- github.com/Hadaward37/trading-ai
 //
-// =============================================================================
-//  Trading AI -- Multi-Indicator Strategy v2  (Pine Script v5)
-//
-//  Logica identica ao sistema Python:
-//    - Voto 2-de-3 (RSI + MACD crossover + BB toque)
-//    - Filtro ADX >= 25  ->  mercado em tendencia
-//    - Filtro Stoch < 25 (BUY) / > 75 (SELL)
-//    - Stop Loss  : 2.5x ATR
-//    - Take Profit: 4.0x ATR
-//
-//  Score 0-5: conta quantas das 5 condicoes confirmaram o sinal
-//  Adicione ao grafico como "Strategy" no TradingView.
-// =============================================================================
+// Trading AI -- Multi-Indicator Strategy v2  (Pine Script v5)
+// Logica: Voto 2-de-3 (RSI + MACD crossover + BB) + Filtro ADX + Stoch
+// Stop Loss 2.5x ATR | Take Profit 4.0x ATR | Score 0-5
 
 //@version=5
-strategy(
-    title             = "Trading AI -- Multi-Indicator Strategy v2",
-    shorttitle        = "TradingAI",
-    overlay           = true,
-    initial_capital   = 10000,
-    default_qty_type  = strategy.percent_of_equity,
-    default_qty_value = 10,
-    commission_type   = strategy.commission.percent,
-    commission_value  = 0.1,
-    slippage          = 2,
-    max_labels_count  = 500,
-    max_lines_count   = 500
-)
+strategy("Trading AI -- Multi-Indicator Strategy v2", shorttitle="TradingAI", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.1, slippage=2)
 
 // =============================================================================
 // Inputs
 // =============================================================================
 
-// RSI
-rsi_len  = input.int(14,  "Periodo",   group="RSI")
-rsi_buy  = input.int(35,  "Compra <",  group="RSI", minval=10, maxval=50)
-rsi_sell = input.int(75,  "Venda >",   group="RSI", minval=51, maxval=90)
+rsi_len  = input.int(14, "Periodo",  group="RSI")
+rsi_buy  = input.int(35, "Compra <", group="RSI", minval=10, maxval=50)
+rsi_sell = input.int(75, "Venda >",  group="RSI", minval=51, maxval=90)
 
-// MACD
-macd_fast = input.int(12, "Rapida",  group="MACD")
-macd_slow = input.int(26, "Lenta",   group="MACD")
-macd_sign = input.int(9,  "Sinal",   group="MACD")
+macd_fast = input.int(12, "Rapida", group="MACD")
+macd_slow = input.int(26, "Lenta",  group="MACD")
+macd_sign = input.int(9,  "Sinal",  group="MACD")
 
-// Bollinger Bands
 bb_len = input.int(20,    "Periodo", group="Bollinger Bands")
 bb_dev = input.float(2.0, "Desvio",  group="Bollinger Bands", step=0.1)
-bb_tol = input.float(0.002, "Tolerancia de toque", group="Bollinger Bands", step=0.001, tooltip="Preco ate X% alem da banda conta como toque")
+bb_tol = input.float(0.002, "Tolerancia de toque", group="Bollinger Bands", step=0.001)
 
-// ATR / Risco
-atr_len = input.int(14,   "Periodo ATR",       group="ATR e Risco")
-sl_mult = input.float(2.5, "Stop Loss (x ATR)", group="ATR e Risco", step=0.5, minval=0.5)
+atr_len = input.int(14,    "Periodo ATR",        group="ATR e Risco")
+sl_mult = input.float(2.5, "Stop Loss (x ATR)",   group="ATR e Risco", step=0.5, minval=0.5)
 tp_mult = input.float(4.0, "Take Profit (x ATR)", group="ATR e Risco", step=0.5, minval=1.0)
 
-// ADX
-adx_len    = input.int(14, "Periodo",   group="ADX - Filtro de Tendencia")
-adx_thresh = input.int(25, "Threshold", group="ADX - Filtro de Tendencia", tooltip="Sinais bloqueados quando ADX < threshold (mercado lateral)")
+adx_len    = input.int(14, "Periodo",   group="ADX Filtro de Tendencia")
+adx_thresh = input.int(25, "Threshold", group="ADX Filtro de Tendencia")
 
-// Estocastico
 stoch_k_len = input.int(14, "Periodo K",  group="Estocastico")
 stoch_d_len = input.int(3,  "Smooth K",   group="Estocastico")
 stoch_sm    = input.int(3,  "Smooth D",   group="Estocastico")
 stoch_ob    = input.int(75, "Overbought", group="Estocastico")
 stoch_os    = input.int(25, "Oversold",   group="Estocastico")
 
-// Visual
 show_bb     = input.bool(true, "Mostrar Bollinger Bands", group="Visual")
 show_labels = input.bool(true, "Mostrar labels de score", group="Visual")
 show_sl_tp  = input.bool(true, "Mostrar linhas SL/TP",    group="Visual")
@@ -89,10 +60,10 @@ atr_val = ta.atr(atr_len)
 
 stoch_raw = ta.stoch(close, high, low, stoch_k_len)
 stoch_k   = ta.sma(stoch_raw, stoch_d_len)
-stoch_d   = ta.sma(stoch_k,   stoch_sm)
+stoch_d   = ta.sma(stoch_k, stoch_sm)
 
 // =============================================================================
-// Votos  (sistema 2-de-3: RSI + MACD crossover + BB toque)
+// Votos 2-de-3 (RSI + MACD crossover + BB toque)
 // =============================================================================
 
 v_rsi_buy   = rsi_val < rsi_buy   ? 1 : 0
@@ -114,13 +85,12 @@ stoch_ok_b = stoch_k  <  stoch_os
 stoch_ok_s = stoch_k  >  stoch_ob
 
 // =============================================================================
-// Sinais finais
+// Sinais finais + Score
 // =============================================================================
 
 buy_signal  = buy_votes  >= 2 and adx_ok and stoch_ok_b
 sell_signal = sell_votes >= 2 and adx_ok and stoch_ok_s
 
-// Score 0-5: quantas condicoes confirmaram
 buy_score  = buy_votes  + (adx_ok ? 1 : 0) + (stoch_ok_b ? 1 : 0)
 sell_score = sell_votes + (adx_ok ? 1 : 0) + (stoch_ok_s ? 1 : 0)
 
@@ -128,39 +98,29 @@ sell_score = sell_votes + (adx_ok ? 1 : 0) + (stoch_ok_s ? 1 : 0)
 // Plots -- Bollinger Bands
 // =============================================================================
 
-bb_line_col  = color.rgb(100, 149, 237, 55)
-bb_fill_col  = color.rgb(100, 149, 237, 92)
+bb_col = color.rgb(100, 149, 237, 55)
 
-p_bb_upper = plot(show_bb ? bb_upper : na, "BB Upper", bb_line_col, linewidth=1)
-p_bb_lower = plot(show_bb ? bb_lower : na, "BB Lower", bb_line_col, linewidth=1)
+p_upper = plot(show_bb ? bb_upper : na, "BB Upper", bb_col, linewidth=1)
+p_lower = plot(show_bb ? bb_lower : na, "BB Lower", bb_col, linewidth=1)
 plot(show_bb ? bb_mid : na, "BB Mid", color.rgb(100, 149, 237, 70), linewidth=1)
-fill(p_bb_upper, p_bb_lower, bb_fill_col)
+fill(p_upper, p_lower, color.rgb(100, 149, 237, 92))
 
 // =============================================================================
-// Plots -- Sinais (triangulos no grafico de preco)
+// Plots -- Sinais
 // =============================================================================
 
 plotshape(buy_signal,  "BUY",  shape.triangleup,   location.belowbar, color.new(color.green, 0), size=size.small)
-plotshape(sell_signal, "SELL", shape.triangledown, location.abovebar, color.new(color.red, 0),   size=size.small)
+plotshape(sell_signal, "SELL", shape.triangledown, location.abovebar, color.new(color.red,   0), size=size.small)
 
 // =============================================================================
 // Labels de score
 // =============================================================================
 
-if show_labels
-    if buy_signal
-        label.new(bar_index, low * 0.9997, "BUY\n" + str.tostring(buy_score) + "/5",
-            color     = color.new(color.green, 15),
-            textcolor = color.white,
-            style     = label.style_label_up,
-            size      = size.small)
+if show_labels and buy_signal
+    label.new(bar_index, low * 0.9997, "BUY\n" + str.tostring(buy_score) + "/5", color=color.new(color.green, 15), textcolor=color.white, style=label.style_label_up, size=size.small)
 
-    if sell_signal
-        label.new(bar_index, high * 1.0003, "SELL\n" + str.tostring(sell_score) + "/5",
-            color     = color.new(color.red, 15),
-            textcolor = color.white,
-            style     = label.style_label_down,
-            size      = size.small)
+if show_labels and sell_signal
+    label.new(bar_index, high * 1.0003, "SELL\n" + str.tostring(sell_score) + "/5", color=color.new(color.red, 15), textcolor=color.white, style=label.style_label_down, size=size.small)
 
 // =============================================================================
 // Linhas de SL / TP
@@ -168,74 +128,60 @@ if show_labels
 
 SL_TP_BARS = 25
 
-if show_sl_tp
-    if buy_signal
-        sl_p = close - sl_mult * atr_val
-        tp_p = close + tp_mult * atr_val
-        line.new(bar_index, sl_p, bar_index + SL_TP_BARS, sl_p, color=color.new(color.red,   20), width=2, style=line.style_dashed)
-        line.new(bar_index, tp_p, bar_index + SL_TP_BARS, tp_p, color=color.new(color.green, 20), width=2, style=line.style_dashed)
+if show_sl_tp and buy_signal
+    sl_b = close - sl_mult * atr_val
+    tp_b = close + tp_mult * atr_val
+    line.new(bar_index, sl_b, bar_index + SL_TP_BARS, sl_b, color=color.new(color.red,   20), width=2, style=line.style_dashed)
+    line.new(bar_index, tp_b, bar_index + SL_TP_BARS, tp_b, color=color.new(color.green, 20), width=2, style=line.style_dashed)
 
-    if sell_signal
-        sl_p = close + sl_mult * atr_val
-        tp_p = close - tp_mult * atr_val
-        line.new(bar_index, sl_p, bar_index + SL_TP_BARS, sl_p, color=color.new(color.red,   20), width=2, style=line.style_dashed)
-        line.new(bar_index, tp_p, bar_index + SL_TP_BARS, tp_p, color=color.new(color.green, 20), width=2, style=line.style_dashed)
+if show_sl_tp and sell_signal
+    sl_s = close + sl_mult * atr_val
+    tp_s = close - tp_mult * atr_val
+    line.new(bar_index, sl_s, bar_index + SL_TP_BARS, sl_s, color=color.new(color.red,   20), width=2, style=line.style_dashed)
+    line.new(bar_index, tp_s, bar_index + SL_TP_BARS, tp_s, color=color.new(color.green, 20), width=2, style=line.style_dashed)
 
 // =============================================================================
 // Dashboard (tabela canto superior direito)
 // =============================================================================
 
-var table dash = table.new(position.top_right, 2, 8,
-    bgcolor      = color.new(color.black, 25),
-    border_color = color.new(color.gray,  50),
-    border_width = 1,
-    frame_color  = color.new(color.gray,  30),
-    frame_width  = 1)
+var table dash = table.new(position.top_right, 2, 8, bgcolor=color.new(color.black, 25), border_color=color.new(color.gray, 50), border_width=1)
 
 if show_table and barstate.islast
-    // Cabecalho
     table.cell(dash, 0, 0, "Indicador", text_color=color.new(color.gray, 20), bgcolor=color.new(color.black, 10), text_size=size.small)
     table.cell(dash, 1, 0, "Status",    text_color=color.new(color.gray, 20), bgcolor=color.new(color.black, 10), text_size=size.small)
 
-    // RSI
     rsi_tc = rsi_val < rsi_buy ? color.green : rsi_val > rsi_sell ? color.red : color.silver
     table.cell(dash, 0, 1, "RSI (" + str.tostring(rsi_len) + ")", text_color=color.new(color.silver, 20), text_size=size.small)
-    table.cell(dash, 1, 1, str.tostring(math.round(rsi_val, 1)),  text_color=rsi_tc, text_size=size.small)
+    table.cell(dash, 1, 1, str.tostring(math.round(rsi_val, 1)), text_color=rsi_tc, text_size=size.small)
 
-    // MACD
     macd_tc  = macd_line > macd_sig_line ? color.green : color.red
     macd_txt = macd_line > macd_sig_line ? "Alta" : "Baixa"
     table.cell(dash, 0, 2, "MACD",   text_color=color.new(color.silver, 20), text_size=size.small)
     table.cell(dash, 1, 2, macd_txt, text_color=macd_tc, text_size=size.small)
 
-    // BB
-    bb_pos_txt = close < bb_lower ? "Inferior" : close > bb_upper ? "Superior" : "Meio"
-    bb_pos_tc  = close < bb_lower ? color.green : close > bb_upper ? color.red : color.silver
-    table.cell(dash, 0, 3, "Bollinger",  text_color=color.new(color.silver, 20), text_size=size.small)
-    table.cell(dash, 1, 3, bb_pos_txt,   text_color=bb_pos_tc, text_size=size.small)
+    bb_txt = close < bb_lower ? "Inferior" : close > bb_upper ? "Superior" : "Meio"
+    bb_tc  = close < bb_lower ? color.green : close > bb_upper ? color.red : color.silver
+    table.cell(dash, 0, 3, "Bollinger", text_color=color.new(color.silver, 20), text_size=size.small)
+    table.cell(dash, 1, 3, bb_txt,      text_color=bb_tc, text_size=size.small)
 
-    // ADX
     adx_tc  = adx_ok ? color.green : color.red
     adx_txt = str.tostring(math.round(adx_val, 1)) + (adx_ok ? " ok" : " fraco")
     table.cell(dash, 0, 4, "ADX (" + str.tostring(adx_len) + ")", text_color=color.new(color.silver, 20), text_size=size.small)
     table.cell(dash, 1, 4, adx_txt, text_color=adx_tc, text_size=size.small)
 
-    // Stoch
     sk_tc = stoch_k < stoch_os ? color.green : stoch_k > stoch_ob ? color.red : color.silver
-    table.cell(dash, 0, 5, "Stoch %K",                        text_color=color.new(color.silver, 20), text_size=size.small)
+    table.cell(dash, 0, 5, "Stoch %K",                         text_color=color.new(color.silver, 20), text_size=size.small)
     table.cell(dash, 1, 5, str.tostring(math.round(stoch_k, 1)), text_color=sk_tc, text_size=size.small)
 
-    // Sinal
     sig_txt = buy_signal ? "BUY" : sell_signal ? "SELL" : "HOLD"
     sig_tc  = buy_signal ? color.green : sell_signal ? color.red : color.gray
     table.cell(dash, 0, 6, "Sinal",  text_color=color.new(color.silver, 20), text_size=size.small)
     table.cell(dash, 1, 6, sig_txt,  text_color=sig_tc, text_size=size.small)
 
-    // Score
-    cur_score  = buy_signal ? buy_score : sell_signal ? sell_score : 0
-    score_tc   = cur_score >= 4 ? color.green : cur_score >= 2 ? color.yellow : color.gray
-    table.cell(dash, 0, 7, "Score",                              text_color=color.new(color.silver, 20), text_size=size.small)
-    table.cell(dash, 1, 7, str.tostring(cur_score) + " / 5",    text_color=score_tc, text_size=size.small)
+    cur_score = buy_signal ? buy_score : sell_signal ? sell_score : 0
+    score_tc  = cur_score >= 4 ? color.green : cur_score >= 2 ? color.yellow : color.gray
+    table.cell(dash, 0, 7, "Score",                           text_color=color.new(color.silver, 20), text_size=size.small)
+    table.cell(dash, 1, 7, str.tostring(cur_score) + " / 5", text_color=score_tc, text_size=size.small)
 
 // =============================================================================
 // Entradas / Saidas da estrategia
@@ -243,32 +189,16 @@ if show_table and barstate.islast
 
 if buy_signal
     strategy.entry("Long", strategy.long, comment="BUY " + str.tostring(buy_score) + "/5")
-    strategy.exit("Long Exit", "Long",
-        stop    = strategy.position_avg_price - sl_mult * atr_val,
-        limit   = strategy.position_avg_price + tp_mult * atr_val,
-        comment_loss   = "SL",
-        comment_profit = "TP")
+    strategy.exit("Long Exit", "Long", stop=strategy.position_avg_price - sl_mult * atr_val, limit=strategy.position_avg_price + tp_mult * atr_val)
 
 if sell_signal
     strategy.entry("Short", strategy.short, comment="SELL " + str.tostring(sell_score) + "/5")
-    strategy.exit("Short Exit", "Short",
-        stop    = strategy.position_avg_price + sl_mult * atr_val,
-        limit   = strategy.position_avg_price - tp_mult * atr_val,
-        comment_loss   = "SL",
-        comment_profit = "TP")
+    strategy.exit("Short Exit", "Short", stop=strategy.position_avg_price + sl_mult * atr_val, limit=strategy.position_avg_price - tp_mult * atr_val)
 
 // =============================================================================
 // Alertas
 // =============================================================================
 
-alertcondition(buy_signal,
-    "Trading AI -- BUY",
-    "BUY | {{ticker}} | Preco: {{close}} | Score: " + str.tostring(buy_score) + "/5")
-
-alertcondition(sell_signal,
-    "Trading AI -- SELL",
-    "SELL | {{ticker}} | Preco: {{close}} | Score: " + str.tostring(sell_score) + "/5")
-
-alertcondition(buy_signal or sell_signal,
-    "Trading AI -- Qualquer Sinal",
-    "Sinal detectado em {{ticker}} | Preco: {{close}}")
+alertcondition(buy_signal,  "Trading AI -- BUY",  "BUY | {{ticker}} | {{close}} | Score: " + str.tostring(buy_score) + "/5")
+alertcondition(sell_signal, "Trading AI -- SELL", "SELL | {{ticker}} | {{close}} | Score: " + str.tostring(sell_score) + "/5")
+alertcondition(buy_signal or sell_signal, "Trading AI -- Qualquer Sinal", "Sinal em {{ticker}} | {{close}}")
