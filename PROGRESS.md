@@ -1,7 +1,7 @@
 # Trading AI — Log de Progresso
 
 ## Sistema
-- **Ativo:** EUR/USD
+- **Ativos:** EUR/USD (Forex) | VALE3, PETR4, ITUB4, BBDC4, IBOV (B3)
 - **Timeframes:** 15m, 1H, 4H (4H resampled do 1H)
 - **Storage:** SQLite local (`data/trading.db`)
 - **Dashboard:** Streamlit + Plotly (`streamlit run dashboard/app.py`)
@@ -51,7 +51,7 @@
 - [x] Alertas Telegram — `core/notifier.py` + `core/scheduler.py`
 - [x] Config centralizado — `config.py`
 - [x] Filtro de notícias/eventos econômicos — `core/news_filter.py` (FF JSON + BS4, cache 1h, ±30 min)
-- [ ] Ações brasileiras (Ibovespa, VALE3, PETR4)
+- [x] Ações brasileiras — `config.ASSETS` (VALE3, PETR4, ITUB4, BBDC4, IBOV via yfinance)
 - [ ] Integração TradingView / Pine Script export
 
 ## Estrutura do Projeto
@@ -103,9 +103,9 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 ```
 
 ## Próximos Passos
-1. **Filtro de notícias** — desativar sinais em janelas de high-impact (FOMC, NFP, CPI)
-2. **Ações brasileiras** — adicionar VALE3.SA, PETR4.SA, IBOV via yfinance
-3. **TradingView** — exportar estratégia em Pine Script para backtesting visual
+1. **TradingView** — exportar estratégia em Pine Script para backtesting visual
+2. **Optimizer por ativo** — rodar grid search separado para VALE3/PETR4 (parâmetros diferentes do Forex)
+3. **DB multi-asset** — schema SQLite para salvar sinais de todos os ativos
 
 ## Como Retomar
 Ao iniciar nova conversa com Claude, cole:

@@ -19,7 +19,7 @@ class SignalAlert:
     """All data needed to render one trading alert message."""
 
     signal:      str    # "BUY" | "SELL" | "HOLD"
-    asset:       str    # e.g. "EURUSD=X"
+    asset:       str    # e.g. "EUR/USD" or "VALE3"
     timeframe:   str    # e.g. "1h"
     price:       float
     stop_loss:   float
@@ -28,6 +28,8 @@ class SignalAlert:
     confidence:  int    # 1..3 — how many indicators agreed
     rsi:         float
     atr:         float
+    flag:        str = "📊"   # flag emoji from ASSET_META
+    decimals:    int = 5      # price decimal places (5=forex, 2=stocks, 0=index)
 
 
 class TelegramNotifier:
@@ -75,6 +77,9 @@ class TelegramNotifier:
         conf_bar = "█" * a.confidence + "░" * (3 - a.confidence)
         conf_pct = int(a.confidence / 3 * 100)
 
+        d   = a.decimals
+        fmt = f".{d}f"
+
         # Percent distances from current price
         sl_pct = abs(a.price - a.stop_loss)   / a.price * 100
         tp_pct = abs(a.take_profit - a.price) / a.price * 100
@@ -84,16 +89,16 @@ class TelegramNotifier:
         tp_sign = "+" if a.signal == "BUY" else "-"
 
         lines = [
-            f"{emoji} *{a.signal} — {a.asset}*",
+            f"{emoji} {a.flag} *{a.signal} — {a.asset}*",
             "",
             f"📊 *Timeframe:*    `{a.timeframe}`",
-            f"💰 *Preco atual:*  `{a.price:.5f}`",
-            f"🛑 *Stop Loss:*    `{a.stop_loss:.5f}` ({sl_sign}{sl_pct:.2f}%)",
-            f"🎯 *Take Profit:*  `{a.take_profit:.5f}` ({tp_sign}{tp_pct:.2f}%)",
+            f"💰 *Preco atual:*  `{a.price:{fmt}}`",
+            f"🛑 *Stop Loss:*    `{a.stop_loss:{fmt}}` ({sl_sign}{sl_pct:.2f}%)",
+            f"🎯 *Take Profit:*  `{a.take_profit:{fmt}}` ({tp_sign}{tp_pct:.2f}%)",
             f"⚖️ *Risco/Retorno:* `1 : {rr:.1f}`",
             "",
-            f"📈 *RSI ({14}):*    `{a.rsi:.1f}`",
-            f"📉 *ATR:*          `{a.atr:.5f}`",
+            f"📈 *RSI (14):*     `{a.rsi:.1f}`",
+            f"📉 *ATR:*          `{a.atr:{fmt}}`",
             "",
             f"🏆 *Win Rate hist:* `{a.win_rate:.1f}%`",
             f"💡 *Confianca:*    `{conf_bar}` {conf_pct}% ({a.confidence}/3 indicadores)",

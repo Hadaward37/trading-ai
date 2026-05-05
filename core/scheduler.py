@@ -1,7 +1,9 @@
-"""Signal scheduler — polls market data every N minutes and fires Telegram
-alerts only when the signal changes (BUY <-> SELL / HOLD -> BUY|SELL).
+"""Signal scheduler — polls all assets every N minutes and fires Telegram alerts
+only when the signal changes (BUY <-> SELL / HOLD -> BUY|SELL).
 
 Spam prevention: HOLD signals and repeated identical signals are suppressed.
+News filter: high-impact economic events block signal alerts with a warning.
+Multi-asset: monitors EUR/USD, VALE3, PETR4, ITUB4, BBDC4, IBOV simultaneously.
 """
 
 from __future__ import annotations
@@ -13,7 +15,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# Ensure project root is importable regardless of how this module is invoked
 _ROOT = Path(__file__).parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -24,7 +25,7 @@ from core.collector import fetch_ohlcv
 from core.indicators import add_all_indicators
 from core.news_filter import is_danger_zone
 from core.notifier import SignalAlert, TelegramNotifier
-from core.signals import generate_signals
+from core.signals import generate_signals_custom
 from db.database import save_ohlcv, save_signals
 
 logger = logging.getLogger(__name__)
@@ -57,9 +58,10 @@ def _count_votes(row, prev_row) -> int:
     return int(rsi_vote) + int(macd_vote) + int(bb_vote)
 
 
-def _build_alert(df, win_rate: float) -> SignalAlert:
+def _build_alert(df, win_rate: float, symbol: str) -> SignalAlert:
     """Construct a :class:`SignalAlert` from the last completed bar."""
-    # -2 = last *completed* bar; -1 = current forming bar (not yet closed)
+    meta = config.ASSET_META.get(symbol, config.ASSET_META[config.SYMBOL])
+
     row      = df.iloc[-2]
     prev_row = df.iloc[-3]
 
@@ -68,88 +70,120 @@ def _build_alert(df, win_rate: float) -> SignalAlert:
     price       = float(row["close"])
     atr         = float(row["atr"])
 
-    if signal_val == 1:      # BUY
+    if signal_val == 1:
         stop_loss   = price - config.SL_ATR_MULT * atr
         take_profit = price + config.TP_ATR_MULT * atr
-    elif signal_val == -1:   # SELL
+    elif signal_val == -1:
         stop_loss   = price + config.SL_ATR_MULT * atr
         take_profit = price - config.TP_ATR_MULT * atr
-    else:                    # HOLD — theoretical levels for context
+    else:
         stop_loss   = price - config.SL_ATR_MULT * atr
         take_profit = price + config.TP_ATR_MULT * atr
 
+    d = meta["decimals"]
     return SignalAlert(
         signal      = signal_name,
-        asset       = config.SYMBOL,
+        asset       = meta["name"],
         timeframe   = config.SCHEDULER_TIMEFRAME,
         price       = price,
-        stop_loss   = round(stop_loss, 5),
-        take_profit = round(take_profit, 5),
+        stop_loss   = round(stop_loss,   d),
+        take_profit = round(take_profit, d),
         win_rate    = win_rate,
         confidence  = _count_votes(row, prev_row),
         rsi         = round(float(row["rsi"]), 2),
-        atr         = round(atr, 5),
+        atr         = round(atr, d),
+        flag        = meta["flag"],
+        decimals    = d,
     )
 
 
-# ── Core cycle ────────────────────────────────────────────────────────────────
+# ── Per-asset cycle ───────────────────────────────────────────────────────────
 
-def run_once(
+def _run_asset(
+    symbol: str,
     notifier: TelegramNotifier,
     last_signal: Optional[int],
 ) -> int:
-    """Execute one pipeline cycle.
+    """Run one full pipeline cycle for a single asset.
 
-    Returns:
-        The signal value of the last completed bar (1, -1, or 0).
+    Returns the signal value of the last completed bar (1, -1, or 0).
     """
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logger.info("--- Cycle start | %s ---", now)
+    meta = config.ASSET_META.get(symbol, config.ASSET_META[config.SYMBOL])
+    name = meta["name"]
 
-    df = fetch_ohlcv(timeframe=config.SCHEDULER_TIMEFRAME)
-    df = add_all_indicators(df)
-    df = generate_signals(df)
+    try:
+        df = fetch_ohlcv(timeframe=config.SCHEDULER_TIMEFRAME, symbol=symbol)
+        df = add_all_indicators(df)
+        # check_news=False here — we do the news check manually below so we can
+        # send a meaningful blocked message rather than just silently returning 0
+        df = generate_signals_custom(df, config.RSI_BUY, config.RSI_SELL, check_news=False)
 
-    save_ohlcv(df[["open", "high", "low", "close", "volume"]], config.SCHEDULER_TIMEFRAME)
-    save_signals(df, config.SCHEDULER_TIMEFRAME)
+        # Only save DB records for the default asset to avoid schema complexity
+        if symbol == config.SYMBOL:
+            save_ohlcv(df[["open", "high", "low", "close", "volume"]], config.SCHEDULER_TIMEFRAME)
+            save_signals(df, config.SCHEDULER_TIMEFRAME)
 
-    bt = run_backtest(df)
+        bt = run_backtest(df)
 
-    last_row   = df.iloc[-2]
-    cur_signal = int(last_row["signal"])
-    cur_name   = _SIGNAL_NAMES.get(cur_signal, "HOLD")
+        last_row   = df.iloc[-2]
+        cur_signal = int(last_row["signal"])
+        cur_name   = _SIGNAL_NAMES.get(cur_signal, "HOLD")
 
-    logger.info(
-        "Signal=%-4s | RSI=%5.1f | Price=%.5f | WinRate=%.1f%%",
-        cur_name, float(last_row["rsi"]), float(last_row["close"]), bt.win_rate,
-    )
+        logger.info(
+            "%s %s | Signal=%-4s RSI=%5.1f Price=%s WinRate=%.1f%%",
+            meta["flag"], name, cur_name, float(last_row["rsi"]),
+            f"{float(last_row['close']):.{meta['decimals']}f}", bt.win_rate,
+        )
 
-    # ── Alert logic: fire only on meaningful signal changes ───────────────────
-    if cur_signal != 0 and cur_signal != last_signal:
-        news_blocked, news_reason = is_danger_zone()
-        if news_blocked:
-            logger.info("News filter blocked signal (%s) — event: %s", cur_name, news_reason)
-            notifier.send_text(
-                f"⚠️ Sinal bloqueado — evento de alto impacto: {news_reason}\n"
-                f"Sinal técnico: {cur_name} | Aguardando janela segura "
-                f"(±{config.NEWS_FILTER_WINDOW_MINUTES} min)"
-            )
+        # ── Alert logic ───────────────────────────────────────────────────────
+        if cur_signal != 0 and cur_signal != last_signal:
+            news_blocked, news_reason = is_danger_zone()
+            if news_blocked:
+                logger.info("[%s] News filter blocked — %s", name, news_reason)
+                notifier.send_text(
+                    f"⚠️ {meta['flag']} {name} — sinal bloqueado\n"
+                    f"Evento de alto impacto: {news_reason}\n"
+                    f"Sinal técnico: {cur_name} | Aguardando janela segura "
+                    f"(±{config.NEWS_FILTER_WINDOW_MINUTES} min)"
+                )
+            else:
+                alert = _build_alert(df, bt.win_rate, symbol)
+                logger.info("[%s] Signal changed %s -> %s — sending alert",
+                            name, _SIGNAL_NAMES.get(last_signal, "NONE"), cur_name)
+                notifier.send_signal_alert(alert)
+
+        elif cur_signal == 0 and last_signal not in (0, None):
+            logger.info("[%s] Signal cleared -> HOLD", name)
         else:
-            alert = _build_alert(df, bt.win_rate)
-            logger.info("Signal changed %s -> %s — sending alert",
-                        _SIGNAL_NAMES.get(last_signal, "NONE"), cur_name)
-            notifier.send_signal_alert(alert)
+            logger.info("[%s] No signal change — skipping", name)
 
-    elif cur_signal == 0 and last_signal not in (0, None):
-        logger.info("Signal cleared -> HOLD (no alert sent)")
+        return cur_signal
 
-    else:
-        logger.info("No signal change — skipping alert")
-
-    return cur_signal
+    except Exception:
+        logger.exception("[%s] Unhandled error in asset cycle", name)
+        return last_signal if last_signal is not None else 0
 
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
+
+def run_once(
+    notifier: TelegramNotifier,
+    last_signals: dict[str, Optional[int]],
+) -> dict[str, int]:
+    """Execute one pipeline cycle for ALL configured assets.
+
+    Returns:
+        Updated mapping of symbol -> current signal.
+    """
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.info("=== Cycle start | %s | %d assets ===", now, len(config.ASSETS))
+
+    updated: dict[str, int] = {}
+    for name, symbol in config.ASSETS.items():
+        updated[symbol] = _run_asset(symbol, notifier, last_signals.get(symbol))
+
+    return updated
+
 
 def run_scheduler() -> None:
     """Infinite polling loop. Runs :func:`run_once` every
@@ -169,22 +203,26 @@ def run_scheduler() -> None:
             "Alerts will be printed to the log only."
         )
     else:
+        asset_list = " | ".join(config.ASSETS.keys())
         notifier.send_text(
-            f"Trading AI iniciado\n"
-            f"Ativo: {config.SYMBOL} | TF: {config.SCHEDULER_TIMEFRAME} | "
+            f"Trading AI iniciado — multi-asset\n"
+            f"Ativos: {asset_list}\n"
+            f"TF: {config.SCHEDULER_TIMEFRAME} | "
             f"Intervalo: {config.SCHEDULER_INTERVAL_MIN} min"
         )
 
     logger.info(
-        "Scheduler running | interval=%d min | timeframe=%s | asset=%s",
-        config.SCHEDULER_INTERVAL_MIN, config.SCHEDULER_TIMEFRAME, config.SYMBOL,
+        "Scheduler running | interval=%d min | timeframe=%s | assets=%s",
+        config.SCHEDULER_INTERVAL_MIN,
+        config.SCHEDULER_TIMEFRAME,
+        list(config.ASSETS.keys()),
     )
 
-    last_signal: Optional[int] = None
+    last_signals: dict[str, Optional[int]] = {}
 
     while True:
         try:
-            last_signal = run_once(notifier, last_signal)
+            last_signals = run_once(notifier, last_signals)
         except KeyboardInterrupt:
             logger.info("Scheduler stopped by user.")
             break

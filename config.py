@@ -5,6 +5,9 @@ Re-optimised parameters (2026-05-04, v2 — ADX + Stochastic filters):
   ADX Trend threshold = 25 | Stoch Oversold < 25
   -> Sharpe 1.299 | Win Rate 47.2% | Max DD -0.50% | 212 trades (1h)
   (v1 no-filter baseline: Sharpe 1.494, Win Rate 45.2%, 425 trades)
+
+Multi-asset support (2026-05-04):
+  EUR/USD (Forex) + VALE3, PETR4, ITUB4, BBDC4, IBOV (B3)
 """
 
 from __future__ import annotations
@@ -19,10 +22,30 @@ load_dotenv()
 ROOT_DIR = Path(__file__).parent
 
 # ── Data source ───────────────────────────────────────────────────────────────
-SYMBOL      = "EURUSD=X"
+SYMBOL      = "EURUSD=X"            # default / backward-compat
 TIMEFRAMES  = ("15m", "1h", "4h")   # 4h is resampled from 1h internally
 DEFAULT_TF  = "1h"
 DB_PATH     = ROOT_DIR / "data" / "trading.db"
+
+# ── Multi-asset universe ──────────────────────────────────────────────────────
+ASSETS: dict[str, str] = {
+    "EUR/USD": "EURUSD=X",
+    "VALE3":   "VALE3.SA",
+    "PETR4":   "PETR4.SA",
+    "ITUB4":   "ITUB4.SA",
+    "BBDC4":   "BBDC4.SA",
+    "IBOV":    "^BVSP",
+}
+
+# Per-asset display metadata
+ASSET_META: dict[str, dict] = {
+    "EURUSD=X": {"name": "EUR/USD", "currency": "USD", "flag": "🌍", "decimals": 5, "exchange": "Forex"},
+    "VALE3.SA": {"name": "VALE3",   "currency": "BRL", "flag": "🇧🇷", "decimals": 2, "exchange": "B3"},
+    "PETR4.SA": {"name": "PETR4",   "currency": "BRL", "flag": "🇧🇷", "decimals": 2, "exchange": "B3"},
+    "ITUB4.SA": {"name": "ITUB4",   "currency": "BRL", "flag": "🇧🇷", "decimals": 2, "exchange": "B3"},
+    "BBDC4.SA": {"name": "BBDC4",   "currency": "BRL", "flag": "🇧🇷", "decimals": 2, "exchange": "B3"},
+    "^BVSP":    {"name": "IBOV",    "currency": "BRL", "flag": "🇧🇷", "decimals": 0, "exchange": "B3"},
+}
 
 # ── RSI  (re-optimised — v2 with ADX + Stoch filters) ────────────────────────
 RSI_PERIOD = 14
@@ -89,4 +112,4 @@ SCHEDULER_TIMEFRAME    = "1h"
 NEWS_FILTER_ENABLED        = True
 NEWS_FILTER_WINDOW_MINUTES = 30          # block N min before AND after event
 NEWS_CACHE_TTL_SECONDS     = 3600        # refresh calendar at most once per hour
-NEWS_FILTER_CURRENCIES     = ("USD", "EUR")  # currencies whose events block signals
+NEWS_FILTER_CURRENCIES     = ("USD", "EUR", "BRL")  # currencies whose events block signals

@@ -1,19 +1,26 @@
 """Data collection module — fetches OHLCV data from yfinance.
 
-Supports 15m, 1h natively, and 4h via resampling of 1h data.
+Supports any yfinance ticker (Forex, B3 stocks, indices).
+Timeframes 15m and 1h are fetched directly; 4h is produced by resampling 1h.
 """
 
 from __future__ import annotations
 
 import logging
+import sys
+from pathlib import Path
 from typing import Literal
 
 import pandas as pd
 import yfinance as yf
 
-logger = logging.getLogger(__name__)
+_ROOT = Path(__file__).parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
-SYMBOL = "EURUSD=X"
+import config
+
+logger = logging.getLogger(__name__)
 
 # 4h is handled by resampling 1h — not fetched directly (yfinance limitation)
 _TIMEFRAME_CONFIG: dict[str, dict[str, str]] = {
@@ -37,45 +44,51 @@ def _resample_4h(df: pd.DataFrame) -> pd.DataFrame:
 
 def fetch_ohlcv(
     timeframe: Literal["15m", "1h", "4h"] = "1h",
+    symbol: str | None = None,
     period: str | None = None,
 ) -> pd.DataFrame:
-    """Download EUR/USD OHLCV data from Yahoo Finance.
+    """Download OHLCV data from Yahoo Finance for any supported ticker.
 
     ``"4h"`` is produced by fetching 1h data and resampling; all other
     timeframes are fetched directly.
 
     Args:
         timeframe: Candle interval — ``"15m"``, ``"1h"``, or ``"4h"``.
-        period: Optional override for the lookback window (e.g. ``"30d"``).
+        symbol:    yfinance ticker (e.g. ``"EURUSD=X"``, ``"VALE3.SA"``,
+                   ``"^BVSP"``). Defaults to ``config.SYMBOL``.
+        period:    Optional override for the lookback window (e.g. ``"30d"``).
 
     Returns:
         DataFrame indexed by timezone-naive UTC datetime with columns
         ``open``, ``high``, ``low``, ``close``, ``volume``.
 
     Raises:
-        ValueError: For unsupported timeframe values.
+        ValueError:   For unsupported timeframe values.
         RuntimeError: When yfinance returns no data.
     """
+    _symbol = symbol or config.SYMBOL
+
     if timeframe == "4h":
-        df_1h = fetch_ohlcv("1h", period=period)
+        df_1h = fetch_ohlcv("1h", symbol=_symbol, period=period)
         return _resample_4h(df_1h)
 
     if timeframe not in _TIMEFRAME_CONFIG:
         raise ValueError(
-            f"Unsupported timeframe {timeframe!r}. Choose from {list(_TIMEFRAME_CONFIG) + ['4h']}"
+            f"Unsupported timeframe {timeframe!r}. "
+            f"Choose from {list(_TIMEFRAME_CONFIG) + ['4h']}"
         )
 
     cfg = _TIMEFRAME_CONFIG[timeframe]
     effective_period = period or cfg["period"]
 
-    logger.info("Fetching %s | interval=%s period=%s", SYMBOL, cfg["interval"], effective_period)
+    logger.info("Fetching %s | interval=%s period=%s", _symbol, cfg["interval"], effective_period)
 
-    raw = yf.Ticker(SYMBOL).history(
+    raw = yf.Ticker(_symbol).history(
         period=effective_period, interval=cfg["interval"], auto_adjust=True
     )
 
     if raw.empty:
-        raise RuntimeError(f"yfinance returned no data for {SYMBOL!r}")
+        raise RuntimeError(f"yfinance returned no data for {_symbol!r}")
 
     df = raw[["Open", "High", "Low", "Close", "Volume"]].copy()
     df.columns = pd.Index(["open", "high", "low", "close", "volume"])
@@ -88,47 +101,45 @@ def fetch_ohlcv(
     return df
 
 
-def get_mtf_confluence(symbol: str = SYMBOL) -> dict:
+def get_mtf_confluence(symbol: str | None = None) -> dict:
     """Compute signal confluence across 15m, 1h, and 4h timeframes.
 
     Fetches live data for each timeframe, computes indicators and signals,
     and returns whether a majority (>= :data:`config.MTF_MIN_AGREEMENTS`) agree.
 
+    Args:
+        symbol: yfinance ticker. Defaults to ``config.SYMBOL``.
+
     Returns:
         dict with keys ``"15m"``, ``"1h"``, ``"4h"`` (signal int 1/-1/0),
         ``"confluence"`` (consolidated signal), ``"buy_count"``, ``"sell_count"``.
     """
-    import sys
-    from pathlib import Path
-    _root = Path(__file__).parent.parent
-    if str(_root) not in sys.path:
-        sys.path.insert(0, str(_root))
-
-    import config
     from core.indicators import add_all_indicators
-    from core.signals import generate_signals
+    from core.signals import generate_signals_custom
 
+    _symbol = symbol or config.SYMBOL
     results: dict[str, int] = {}
 
-    # Fetch each timeframe
-    df_1h_raw  = fetch_ohlcv("1h")
-    df_15m_raw = fetch_ohlcv("15m")
-    df_4h_raw  = fetch_ohlcv("4h")   # resampled from 1h internally
+    df_1h_raw  = fetch_ohlcv("1h",  symbol=_symbol)
+    df_15m_raw = fetch_ohlcv("15m", symbol=_symbol)
+    df_4h_raw  = fetch_ohlcv("4h",  symbol=_symbol)  # resampled from 1h internally
 
     for tf, df_raw in [("15m", df_15m_raw), ("1h", df_1h_raw), ("4h", df_4h_raw)]:
         try:
             df_ind = add_all_indicators(df_raw)
-            df_sig = generate_signals(df_ind)
-            # Use last COMPLETED bar (index -2); -1 is the forming candle
+            # check_news=False: MTF confluence is used for display only, no blocking needed
+            df_sig = generate_signals_custom(
+                df_ind, config.RSI_BUY, config.RSI_SELL, check_news=False
+            )
             results[tf] = int(df_sig.iloc[-2]["signal"]) if len(df_sig) >= 2 else 0
         except Exception as exc:
-            logger.warning("MTF %s failed: %s", tf, exc)
+            logger.warning("MTF %s %s failed: %s", tf, _symbol, exc)
             results[tf] = 0
 
-    signals     = list(results.values())
-    buy_count   = sum(1 for s in signals if s ==  1)
-    sell_count  = sum(1 for s in signals if s == -1)
-    confluence  = (
+    signals    = list(results.values())
+    buy_count  = sum(1 for s in signals if s ==  1)
+    sell_count = sum(1 for s in signals if s == -1)
+    confluence = (
          1 if buy_count  >= config.MTF_MIN_AGREEMENTS else
         -1 if sell_count >= config.MTF_MIN_AGREEMENTS else 0
     )
