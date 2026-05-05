@@ -22,6 +22,7 @@ import config
 from core.backtest import run_backtest
 from core.collector import fetch_ohlcv
 from core.indicators import add_all_indicators
+from core.news_filter import is_danger_zone
 from core.notifier import SignalAlert, TelegramNotifier
 from core.signals import generate_signals
 from db.database import save_ohlcv, save_signals
@@ -125,10 +126,19 @@ def run_once(
 
     # ── Alert logic: fire only on meaningful signal changes ───────────────────
     if cur_signal != 0 and cur_signal != last_signal:
-        alert = _build_alert(df, bt.win_rate)
-        logger.info("Signal changed %s -> %s — sending alert",
-                    _SIGNAL_NAMES.get(last_signal, "NONE"), cur_name)
-        notifier.send_signal_alert(alert)
+        news_blocked, news_reason = is_danger_zone()
+        if news_blocked:
+            logger.info("News filter blocked signal (%s) — event: %s", cur_name, news_reason)
+            notifier.send_text(
+                f"⚠️ Sinal bloqueado — evento de alto impacto: {news_reason}\n"
+                f"Sinal técnico: {cur_name} | Aguardando janela segura "
+                f"(±{config.NEWS_FILTER_WINDOW_MINUTES} min)"
+            )
+        else:
+            alert = _build_alert(df, bt.win_rate)
+            logger.info("Signal changed %s -> %s — sending alert",
+                        _SIGNAL_NAMES.get(last_signal, "NONE"), cur_name)
+            notifier.send_signal_alert(alert)
 
     elif cur_signal == 0 and last_signal not in (0, None):
         logger.info("Signal cleared -> HOLD (no alert sent)")

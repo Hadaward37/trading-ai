@@ -1,9 +1,11 @@
 """Signal generation — RSI + MACD + BB voting with ADX/Stoch confidence score.
 
-Signal column  : 1=BUY | -1=SELL | 0=HOLD
-Score column   : 0-100 weighted confidence
-                 RSI(25%) + MACD(25%) + BB(20%) + ADX(15%) + Stoch(15%)
-Regime filter  : if regime=="Range" and REGIME_BLOCK_RANGE_SIGNALS, signal=0
+Signal column      : 1=BUY | -1=SELL | 0=HOLD/NEWS_BLOCK
+Score column       : 0-100 weighted confidence
+                     RSI(25%) + MACD(25%) + BB(20%) + ADX(15%) + Stoch(15%)
+Regime filter      : if regime=="Range" and REGIME_BLOCK_RANGE_SIGNALS, signal=0
+news_blocked column: True when a high-impact economic event suppressed the signal
+news_reason column : name of the blocking event (empty string when not blocked)
 """
 
 from __future__ import annotations
@@ -94,9 +96,10 @@ def _score_series(
 def generate_signals(df: pd.DataFrame) -> pd.DataFrame:
     """Generate signals using defaults from ``config``.
 
-    Convenience wrapper around :func:`generate_signals_custom`.
+    Convenience wrapper around :func:`generate_signals_custom` with news
+    filtering enabled (used by the live scheduler and dashboard).
     """
-    return generate_signals_custom(df, config.RSI_BUY, config.RSI_SELL)
+    return generate_signals_custom(df, config.RSI_BUY, config.RSI_SELL, check_news=True)
 
 
 def generate_signals_custom(
@@ -104,6 +107,7 @@ def generate_signals_custom(
     rsi_buy: int,
     rsi_sell: int,
     regime: Optional[str] = None,
+    check_news: bool = False,
 ) -> pd.DataFrame:
     """Add ``signal`` (1/-1/0) and ``score`` (0-100) columns to *df*.
 
@@ -118,14 +122,18 @@ def generate_signals_custom(
     Args:
         df: DataFrame with all indicator columns (from
             :func:`core.indicators.add_all_indicators`).
-        rsi_buy:  Buy threshold (RSI below this counts as oversold vote).
-        rsi_sell: Sell threshold (RSI above this counts as overbought vote).
-        regime:   Current market regime string. When
+        rsi_buy:    Buy threshold (RSI below this counts as oversold vote).
+        rsi_sell:   Sell threshold (RSI above this counts as overbought vote).
+        regime:     Current market regime string. When
             :data:`config.REGIME_BLOCK_RANGE_SIGNALS` is True and regime is
             ``"Range"``, all signals are suppressed.
+        check_news: When True, call :func:`core.news_filter.is_danger_zone`
+            and suppress signals near high-impact economic events.
+            Disabled by default so the optimizer/backtest are unaffected.
 
     Returns:
-        Copy of *df* with ``signal`` and ``score`` columns appended.
+        Copy of *df* with ``signal``, ``score``, ``news_blocked``, and
+        ``news_reason`` columns appended.
     """.format(
         rsi_w=config.SCORE_WEIGHT_RSI, macd_w=config.SCORE_WEIGHT_MACD,
         bb_w=config.SCORE_WEIGHT_BB,   adx_w=config.SCORE_WEIGHT_ADX,
@@ -149,5 +157,18 @@ def generate_signals_custom(
     score[df["signal"] ==  1] = buy_score[ df["signal"] ==  1]
     score[df["signal"] == -1] = sell_score[df["signal"] == -1]
     df["score"] = score.round(1)
+
+    # News filter — always add columns; populate when check_news=True
+    df["news_blocked"] = False
+    df["news_reason"]  = ""
+
+    if check_news and config.NEWS_FILTER_ENABLED:
+        from core.news_filter import is_danger_zone  # lazy import avoids circular deps
+        blocked, reason = is_danger_zone()
+        if blocked:
+            df["signal"]       = 0
+            df["score"]        = 0.0
+            df["news_blocked"] = True
+            df["news_reason"]  = reason
 
     return df

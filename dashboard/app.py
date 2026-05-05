@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -16,6 +17,7 @@ import config
 from core.backtest import run_backtest
 from core.collector import fetch_ohlcv, get_mtf_confluence
 from core.indicators import add_all_indicators
+from core.news_filter import get_upcoming_events, is_danger_zone
 from core.regime import detect_regime, regime_color, regime_emoji
 from core.signals import generate_signals_custom
 from db.database import save_ohlcv, save_signals
@@ -65,6 +67,12 @@ def _load_mtf() -> dict:
     return get_mtf_confluence()
 
 
+@st.cache_data(ttl=config.NEWS_CACHE_TTL_SECONDS, show_spinner=False)
+def _load_news_events():
+    """Fetch next high-impact events from ForexFactory. Cached 1 hour."""
+    return get_upcoming_events(n=3)
+
+
 if refresh:
     st.cache_data.clear()
 
@@ -74,9 +82,12 @@ with st.spinner("Fetching EUR/USD data..."):
 # Regime detection (fast — no network)
 regime = detect_regime(base_df)
 
-# Signals: regime passed so filter can suppress Range entries
+# Signals: regime passed so filter can suppress Range entries; news filter active
 override_regime = regime if block_range else None
-df = generate_signals_custom(base_df, rsi_buy=rsi_buy, rsi_sell=rsi_sell, regime=override_regime)
+df = generate_signals_custom(
+    base_df, rsi_buy=rsi_buy, rsi_sell=rsi_sell,
+    regime=override_regime, check_news=True,
+)
 save_ohlcv(df[["open", "high", "low", "close", "volume"]], timeframe)
 save_signals(df, timeframe)
 
@@ -128,17 +139,77 @@ k4.metric("Win Rate",      f"{result.win_rate:.1f}%")
 k5.metric("Total Trades",  str(result.total_trades))
 
 # ── Current signal score ──────────────────────────────────────────────────────
-last_score  = float(df["score"].iloc[-2]) if len(df) > 1 else 0.0
-last_signal = int(df["signal"].iloc[-2]) if len(df) > 1 else 0
-score_color = "#26a69a" if last_signal == 1 else ("#ef5350" if last_signal == -1 else "#888")
+last_row      = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
+last_score    = float(last_row.get("score", 0.0))
+last_signal   = int(last_row.get("signal", 0))
+news_blocked  = bool(last_row.get("news_blocked", False))
+news_reason   = str(last_row.get("news_reason", ""))
+
+if news_blocked:
+    score_color  = "#ff9800"
+    signal_label = f"NEWS BLOCK — {news_reason}"
+else:
+    score_color  = "#26a69a" if last_signal == 1 else ("#ef5350" if last_signal == -1 else "#888")
+    signal_label = "BUY" if last_signal == 1 else ("SELL" if last_signal == -1 else "HOLD")
+
 st.markdown(
     f"<div style='margin:4px 0 12px;padding:8px 16px;border-left:4px solid {score_color};"
     f"background:#1e1e1e;border-radius:4px'>"
     f"Score atual: <b style='color:{score_color};font-size:1.1em'>{last_score:.0f}/100</b> "
-    f"({'BUY' if last_signal==1 else 'SELL' if last_signal==-1 else 'HOLD'})"
+    f"({signal_label})"
     f"</div>",
     unsafe_allow_html=True,
 )
+
+# ── Upcoming economic events ──────────────────────────────────────────────────
+st.markdown("---")
+danger_now, danger_event = is_danger_zone()
+
+col_ev_title, col_ev_badge = st.columns([3, 1])
+with col_ev_title:
+    st.subheader("📅 Próximos Eventos de Alto Impacto")
+with col_ev_badge:
+    if danger_now:
+        st.markdown(
+            "<div style='background:#ef5350;color:white;border-radius:6px;"
+            "padding:6px 12px;text-align:center;margin-top:8px'>"
+            "🔴 ZONA DE PERIGO</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            "<div style='background:#26a69a22;color:#26a69a;border:1px solid #26a69a;"
+            "border-radius:6px;padding:6px 12px;text-align:center;margin-top:8px'>"
+            "✅ Mercado seguro</div>",
+            unsafe_allow_html=True,
+        )
+
+with st.spinner("Carregando calendário econômico..."):
+    upcoming = _load_news_events()
+
+if upcoming:
+    for ev in upcoming:
+        # Display time in local-friendly format (UTC label for transparency)
+        ev_time_str = ev.event_time.strftime("%a %d/%m %H:%Mh UTC")
+        minutes_away = int(
+            (ev.event_time - datetime.now(timezone.utc)).total_seconds() / 60
+        )
+        proximity = (
+            f"<span style='color:#ef5350'>Em {minutes_away} min</span>"
+            if abs(minutes_away) <= config.NEWS_FILTER_WINDOW_MINUTES
+            else f"<span style='color:#aaa'>Em {minutes_away} min</span>"
+        )
+        st.markdown(
+            f"<div style='padding:6px 12px;border-left:3px solid #ef5350;"
+            f"background:#1e1e1e;border-radius:4px;margin-bottom:6px'>"
+            f"<b style='color:#ef5350'>{ev.currency}</b> &nbsp;"
+            f"<b>{ev.title}</b> &nbsp;"
+            f"<span style='color:#aaa'>{ev_time_str}</span> &nbsp; {proximity}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+else:
+    st.info("Nenhum evento de alto impacto (USD/EUR) encontrado nos próximos dias.")
 
 st.markdown("---")
 

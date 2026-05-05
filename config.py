@@ -84,3 +84,9 @@ TELEGRAM_CHAT_ID:   str = os.getenv("TELEGRAM_CHAT_ID", "")
 # ── Scheduler ─────────────────────────────────────────────────────────────────
 SCHEDULER_INTERVAL_MIN = 15
 SCHEDULER_TIMEFRAME    = "1h"
+
+# ── News filter ───────────────────────────────────────────────────────────────
+NEWS_FILTER_ENABLED        = True
+NEWS_FILTER_WINDOW_MINUTES = 30          # block N min before AND after event
+NEWS_CACHE_TTL_SECONDS     = 3600        # refresh calendar at most once per hour
+NEWS_FILTER_CURRENCIES     = ("USD", "EUR")  # currencies whose events block signals
