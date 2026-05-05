@@ -50,7 +50,7 @@
 - [x] Dashboard Streamlit — `dashboard/app.py` (5 painéis + regime + MTF)
 - [x] Alertas Telegram — `core/notifier.py` + `core/scheduler.py`
 - [x] Config centralizado — `config.py`
-- [ ] Filtro de notícias/eventos econômicos
+- [x] Filtro de notícias/eventos econômicos — `core/news_filter.py` (FF JSON + BS4, cache 1h, ±30 min)
 - [ ] Ações brasileiras (Ibovespa, VALE3, PETR4)
 - [ ] Integração TradingView / Pine Script export
 
