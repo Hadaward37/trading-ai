@@ -149,9 +149,16 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 - [ ] Comparar sinais vs resultado real do mercado
 - [ ] Meta: 2-3 meses de paper trading consistente
 
-### Fase 6 — Servidor 24/7
-- [ ] Migrar para Oracle Cloud ou Railway
-- [ ] Sistema rodando sem depender do Samsung
+### ✅ Fase 6 — Servidor 24/7 (concluída 2026-05-05)
+- [x] **VM Oracle Cloud Always Free** — Ubuntu 22.04 LTS, ARM A1.Flex
+- [x] **IP fixo:** `137.131.228.166` — Brazil East (São Paulo)
+- [x] **Systemd** — restart automático, inicia no boot
+- [x] **Sistema rodando 24/7** — Samsung pode ser desligado
+- [x] **Primeiro ciclo confirmado** — 6 ativos, Groq sentimento, Telegram OK
+
+> Deploy: `ssh -i C:\Users\dudut\.ssh\ssh-key-2026-05-05.key ubuntu@137.131.228.166`  
+> Log: `tail -f ~/trading-ai/scheduler.log`  
+> Atualizar: `cd ~/trading-ai && git pull && sudo systemctl restart trading-ai`
 
 ## Como Retomar
 Ao iniciar nova conversa com Claude, cole:
