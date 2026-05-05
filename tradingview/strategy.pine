@@ -1,0 +1,279 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
+// © Trading AI — github.com/Hadaward37/trading-ai
+//
+// ══════════════════════════════════════════════════════════════════════════════
+//  Trading AI — Multi-Indicator Strategy v2  (Pine Script v5)
+//
+//  Lógica idêntica ao sistema Python:
+//    • Voto 2-de-3 (RSI + MACD crossover + BB toque)
+//    • Filtro ADX  ≥ 25  →  mercado em tendência
+//    • Filtro Stoch < 25 (BUY) / > 75 (SELL)
+//    • Stop Loss  : 2.5× ATR
+//    • Take Profit: 4.0× ATR
+//
+//  Score 0-5: conta quantas das 5 condições confirmaram o sinal
+//  Adicione ao gráfico como "Strategy" no TradingView.
+// ══════════════════════════════════════════════════════════════════════════════
+
+//@version=5
+strategy(
+    title             = "Trading AI — Multi-Indicator Strategy v2",
+    shorttitle        = "TradingAI",
+    overlay           = true,
+    initial_capital   = 10000,
+    default_qty_type  = strategy.percent_of_equity,
+    default_qty_value = 10,
+    commission_type   = strategy.commission.percent,
+    commission_value  = 0.1,
+    slippage          = 2,
+    max_labels_count  = 500,
+    max_lines_count   = 500
+)
+
+// ── Inputs ────────────────────────────────────────────────────────────────────
+
+// RSI
+var GRP_RSI = "RSI"
+rsi_len  = input.int(14,  "Período",      group=GRP_RSI)
+rsi_buy  = input.int(35,  "Compra  < ",   group=GRP_RSI, minval=10, maxval=50)
+rsi_sell = input.int(75,  "Venda   > ",   group=GRP_RSI, minval=51, maxval=90)
+
+// MACD
+var GRP_MACD = "MACD"
+macd_fast = input.int(12, "Rápida",  group=GRP_MACD)
+macd_slow = input.int(26, "Lenta",   group=GRP_MACD)
+macd_sign = input.int(9,  "Sinal",   group=GRP_MACD)
+
+// Bollinger Bands
+var GRP_BB = "Bollinger Bands"
+bb_len = input.int(20,   "Período", group=GRP_BB)
+bb_dev = input.float(2.0,"Desvio",  group=GRP_BB, step=0.1)
+bb_tol = input.float(0.002, "Tolerância de toque", group=GRP_BB, step=0.001,
+    tooltip="Preço até X% além da banda conta como toque")
+
+// ATR / Risco
+var GRP_ATR = "ATR & Risco"
+atr_len = input.int(14,  "Período ATR",    group=GRP_ATR)
+sl_mult = input.float(2.5,"Stop Loss  (× ATR)",  group=GRP_ATR, step=0.5, minval=0.5)
+tp_mult = input.float(4.0,"Take Profit (× ATR)", group=GRP_ATR, step=0.5, minval=1.0)
+
+// ADX
+var GRP_ADX = "ADX — Filtro de Tendência"
+adx_len    = input.int(14, "Período",    group=GRP_ADX)
+adx_thresh = input.int(25, "Threshold",  group=GRP_ADX,
+    tooltip="Sinais bloqueados quando ADX < threshold (mercado lateral)")
+
+// Estocástico
+var GRP_STOCH = "Estocástico"
+stoch_k_len = input.int(14, "Período K",  group=GRP_STOCH)
+stoch_d_len = input.int(3,  "Smooth K",   group=GRP_STOCH)
+stoch_sm    = input.int(3,  "Smooth D",   group=GRP_STOCH)
+stoch_ob    = input.int(75, "Overbought", group=GRP_STOCH)
+stoch_os    = input.int(25, "Oversold",   group=GRP_STOCH)
+
+// Visual
+var GRP_VIS = "Visual"
+show_bb     = input.bool(true,  "Mostrar Bollinger Bands", group=GRP_VIS)
+show_labels = input.bool(true,  "Mostrar labels de score", group=GRP_VIS)
+show_sl_tp  = input.bool(true,  "Mostrar linhas SL/TP",    group=GRP_VIS)
+show_table  = input.bool(true,  "Mostrar dashboard",       group=GRP_VIS)
+
+// Alertas
+var GRP_ALERT = "Alertas"
+alert_on_buy  = input.bool(true, "Alerta em BUY",  group=GRP_ALERT)
+alert_on_sell = input.bool(true, "Alerta em SELL", group=GRP_ALERT)
+
+// ── Cálculo dos indicadores ───────────────────────────────────────────────────
+
+rsi_val = ta.rsi(close, rsi_len)
+
+[macd_line, macd_sig_line, macd_hist] = ta.macd(close, macd_fast, macd_slow, macd_sign)
+macd_cross_up = ta.crossover(macd_line, macd_sig_line)
+macd_cross_dn = ta.crossunder(macd_line, macd_sig_line)
+
+[bb_upper, bb_mid, bb_lower] = ta.bb(close, bb_len, bb_dev)
+
+atr_val = ta.atr(atr_len)
+
+[di_plus, di_minus, adx_val] = ta.dmi(adx_len, adx_len)
+
+stoch_raw = ta.stoch(close, high, low, stoch_k_len)
+stoch_k   = ta.sma(stoch_raw, stoch_d_len)   // %K suavizado
+stoch_d   = ta.sma(stoch_k,   stoch_sm)      // %D
+
+// ── Votos (sistema 2-de-3: RSI + MACD crossover + BB toque) ──────────────────
+
+v_rsi_buy   = rsi_val < rsi_buy   ? 1 : 0
+v_rsi_sell  = rsi_val > rsi_sell  ? 1 : 0
+v_macd_buy  = macd_cross_up       ? 1 : 0
+v_macd_sell = macd_cross_dn       ? 1 : 0
+v_bb_buy    = close <= bb_lower * (1 + bb_tol) ? 1 : 0
+v_bb_sell   = close >= bb_upper * (1 - bb_tol) ? 1 : 0
+
+buy_votes  = v_rsi_buy  + v_macd_buy  + v_bb_buy
+sell_votes = v_rsi_sell + v_macd_sell + v_bb_sell
+
+// ── Filtros ───────────────────────────────────────────────────────────────────
+
+adx_ok      = adx_val >= adx_thresh   // mercado em tendência
+stoch_ok_b  = stoch_k  <  stoch_os    // estocástico sobrevendido (BUY)
+stoch_ok_s  = stoch_k  >  stoch_ob    // estocástico sobrecomprado (SELL)
+
+// ── Sinais finais ─────────────────────────────────────────────────────────────
+
+buy_signal  = buy_votes  >= 2 and adx_ok and stoch_ok_b
+sell_signal = sell_votes >= 2 and adx_ok and stoch_ok_s
+
+// Score 0-5: condições confirmadas
+buy_score  = buy_votes  + (adx_ok ? 1 : 0) + (stoch_ok_b ? 1 : 0)
+sell_score = sell_votes + (adx_ok ? 1 : 0) + (stoch_ok_s ? 1 : 0)
+
+// ── Plots — Bollinger Bands ───────────────────────────────────────────────────
+
+bb_col = color.new(color.cornflowerblue, 55)
+p_bb_upper = plot(show_bb ? bb_upper : na, "BB Upper", bb_col, linewidth=1, style=plot.style_line)
+p_bb_lower = plot(show_bb ? bb_lower : na, "BB Lower", bb_col, linewidth=1, style=plot.style_line)
+plot(show_bb ? bb_mid : na, "BB Mid", color.new(color.cornflowerblue, 70), linewidth=1)
+fill(p_bb_upper, p_bb_lower, color.new(color.cornflowerblue, 92))
+
+// ── Plots — Sinais (triângulos no gráfico de preço) ───────────────────────────
+
+plotshape(buy_signal,  "BUY",  shape.triangleup,   location.belowbar,
+    color.new(color.green, 0), size=size.small)
+plotshape(sell_signal, "SELL", shape.triangledown, location.abovebar,
+    color.new(color.red, 0),   size=size.small)
+
+// ── Labels de score ───────────────────────────────────────────────────────────
+
+if show_labels
+    if buy_signal
+        label.new(bar_index, low * 0.9997,
+            "BUY ▲\n" + str.tostring(buy_score) + "/5",
+            color      = color.new(color.green, 15),
+            textcolor  = color.white,
+            style      = label.style_label_up,
+            size       = size.small)
+
+    if sell_signal
+        label.new(bar_index, high * 1.0003,
+            "SELL ▼\n" + str.tostring(sell_score) + "/5",
+            color      = color.new(color.red, 15),
+            textcolor  = color.white,
+            style      = label.style_label_down,
+            size       = size.small)
+
+// ── Linhas de SL / TP ─────────────────────────────────────────────────────────
+
+SL_TP_BARS = 25   // duração visual das linhas (barras)
+
+if show_sl_tp
+    if buy_signal
+        sl_p = close - sl_mult * atr_val
+        tp_p = close + tp_mult * atr_val
+        line.new(bar_index, sl_p, bar_index + SL_TP_BARS, sl_p,
+            color=color.new(color.red,   20), width=2, style=line.style_dashed)
+        line.new(bar_index, tp_p, bar_index + SL_TP_BARS, tp_p,
+            color=color.new(color.green, 20), width=2, style=line.style_dashed)
+
+    if sell_signal
+        sl_p = close + sl_mult * atr_val
+        tp_p = close - tp_mult * atr_val
+        line.new(bar_index, sl_p, bar_index + SL_TP_BARS, sl_p,
+            color=color.new(color.red,   20), width=2, style=line.style_dashed)
+        line.new(bar_index, tp_p, bar_index + SL_TP_BARS, tp_p,
+            color=color.new(color.green, 20), width=2, style=line.style_dashed)
+
+// ── Dashboard (tabela canto superior direito) ─────────────────────────────────
+
+var table dash = table.new(
+    position.top_right, 2, 8,
+    bgcolor      = color.new(color.black, 25),
+    border_color = color.new(color.gray, 50),
+    border_width = 1,
+    frame_color  = color.new(color.gray, 30),
+    frame_width  = 1
+)
+
+f_cell(col, row, txt, tc) =>
+    table.cell(dash, col, row, txt, text_color=tc, text_size=size.small)
+
+f_header(col, row, txt) =>
+    table.cell(dash, col, row, txt,
+        text_color = color.new(color.gray, 20),
+        bgcolor    = color.new(color.black, 10),
+        text_size  = size.small)
+
+if show_table and barstate.islast
+    f_header(0, 0, "Indicador")
+    f_header(1, 0, "Status")
+
+    // RSI
+    rsi_col = rsi_val < rsi_buy ? color.green : rsi_val > rsi_sell ? color.red : color.silver
+    f_cell(0, 1, "RSI (" + str.tostring(rsi_len) + ")",
+        color.new(color.silver, 20))
+    f_cell(1, 1, str.tostring(math.round(rsi_val, 1)), rsi_col)
+
+    // MACD
+    macd_col = macd_line > macd_sig_line ? color.green : color.red
+    f_cell(0, 2, "MACD", color.new(color.silver, 20))
+    f_cell(1, 2, macd_line > macd_sig_line ? "▲ Alta" : "▼ Baixa", macd_col)
+
+    // BB
+    bb_pos = close < bb_lower ? "↓ Inferior" : close > bb_upper ? "↑ Superior" : "— Meio"
+    bb_col2 = close < bb_lower ? color.green : close > bb_upper ? color.red : color.silver
+    f_cell(0, 3, "Bollinger", color.new(color.silver, 20))
+    f_cell(1, 3, bb_pos, bb_col2)
+
+    // ADX
+    adx_col2 = adx_val >= adx_thresh ? color.green : color.red
+    f_cell(0, 4, "ADX (" + str.tostring(adx_len) + ")", color.new(color.silver, 20))
+    f_cell(1, 4, str.tostring(math.round(adx_val, 1)) + (adx_ok ? " ✓" : " ✗"), adx_col2)
+
+    // Stoch
+    sk_col = stoch_k < stoch_os ? color.green : stoch_k > stoch_ob ? color.red : color.silver
+    f_cell(0, 5, "Stoch %K", color.new(color.silver, 20))
+    f_cell(1, 5, str.tostring(math.round(stoch_k, 1)), sk_col)
+
+    // Sinal
+    sig_text = buy_signal ? "🟢 BUY" : sell_signal ? "🔴 SELL" : "⚪ HOLD"
+    sig_col  = buy_signal ? color.green : sell_signal ? color.red : color.gray
+    f_cell(0, 6, "Sinal", color.new(color.silver, 20))
+    f_cell(1, 6, sig_text, sig_col)
+
+    // Score
+    cur_score = buy_signal ? buy_score : sell_signal ? sell_score : 0
+    score_col = cur_score >= 4 ? color.green : cur_score >= 2 ? color.yellow : color.gray
+    f_cell(0, 7, "Score", color.new(color.silver, 20))
+    f_cell(1, 7, str.tostring(cur_score) + " / 5", score_col)
+
+// ── Entradas / Saídas da estratégia ──────────────────────────────────────────
+
+if buy_signal
+    strategy.entry("Long", strategy.long, comment="BUY " + str.tostring(buy_score) + "/5")
+    strategy.exit("Long Exit", "Long",
+        stop  = strategy.position_avg_price - sl_mult * atr_val,
+        limit = strategy.position_avg_price + tp_mult * atr_val,
+        comment_loss = "SL", comment_profit = "TP")
+
+if sell_signal
+    strategy.entry("Short", strategy.short, comment="SELL " + str.tostring(sell_score) + "/5")
+    strategy.exit("Short Exit", "Short",
+        stop  = strategy.position_avg_price + sl_mult * atr_val,
+        limit = strategy.position_avg_price - tp_mult * atr_val,
+        comment_loss = "SL", comment_profit = "TP")
+
+// ── Alertas ───────────────────────────────────────────────────────────────────
+
+price_str = str.tostring(close, format.mintick)
+
+alertcondition(buy_signal,
+    "Trading AI — BUY",
+    "BUY | {{ticker}} | Preço: {{close}} | Score: " + str.tostring(buy_score) + "/5")
+
+alertcondition(sell_signal,
+    "Trading AI — SELL",
+    "SELL | {{ticker}} | Preço: {{close}} | Score: " + str.tostring(sell_score) + "/5")
+
+alertcondition(buy_signal or sell_signal,
+    "Trading AI — Qualquer Sinal",
+    "Sinal detectado em {{ticker}} | Preço: {{close}}")

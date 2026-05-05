@@ -52,7 +52,7 @@
 - [x] Config centralizado — `config.py`
 - [x] Filtro de notícias/eventos econômicos — `core/news_filter.py` (FF JSON + BS4, cache 1h, ±30 min)
 - [x] Ações brasileiras — `config.ASSETS` (VALE3, PETR4, ITUB4, BBDC4, IBOV via yfinance)
-- [ ] Integração TradingView / Pine Script export
+- [x] Integração TradingView / Pine Script — `tradingview/strategy.pine` + `tradingview/indicator.pine`
 
 ## Estrutura do Projeto
 ```
@@ -103,9 +103,9 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 ```
 
 ## Próximos Passos
-1. **TradingView** — exportar estratégia em Pine Script para backtesting visual
-2. **Optimizer por ativo** — rodar grid search separado para VALE3/PETR4 (parâmetros diferentes do Forex)
-3. **DB multi-asset** — schema SQLite para salvar sinais de todos os ativos
+1. **Optimizer por ativo** — rodar grid search separado para VALE3/PETR4 (parâmetros diferentes do Forex)
+2. **DB multi-asset** — schema SQLite para salvar sinais de todos os ativos
+3. **Paper trading** — integrar broker demo (MetaTrader via MT5 ou OANDA API)
 
 ## Como Retomar
 Ao iniciar nova conversa com Claude, cole:
