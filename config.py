@@ -114,6 +114,10 @@ NEWS_FILTER_WINDOW_MINUTES = 30          # block N min before AND after event
 NEWS_CACHE_TTL_SECONDS     = 3600        # refresh calendar at most once per hour
 NEWS_FILTER_CURRENCIES     = ("USD", "EUR", "BRL")  # currencies whose events block signals
 
+# ── Paper Trading ─────────────────────────────────────────────────────────────
+PAPER_TRADING_ENABLED = True
+PAPER_TRADING_CAPITAL = 10_000.0   # capital inicial em R$/USD
+
 # ── News Intelligence — Phase 2 (Gemini + GPT-4o) ────────────────────────────
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
