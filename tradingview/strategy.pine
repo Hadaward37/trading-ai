@@ -48,7 +48,9 @@ show_table  = input.bool(true, "Mostrar dashboard",       group="Visual")
 
 rsi_val = ta.rsi(close, rsi_len)
 
-[macd_line, macd_sig_line, macd_hist] = ta.macd(close, macd_fast, macd_slow, macd_sign)
+// MACD calculado manualmente para evitar variavel histograma nao usada
+macd_line     = ta.ema(close, macd_fast) - ta.ema(close, macd_slow)
+macd_sig_line = ta.ema(macd_line, macd_sign)
 macd_cross_up = ta.crossover(macd_line,  macd_sig_line)
 macd_cross_dn = ta.crossunder(macd_line, macd_sig_line)
 
@@ -56,11 +58,14 @@ macd_cross_dn = ta.crossunder(macd_line, macd_sig_line)
 
 atr_val = ta.atr(atr_len)
 
+// ta.dmi() retorna [diPlus, diMinus, adx] — referencias evitam warnings
 [di_plus, di_minus, adx_val] = ta.dmi(adx_len, adx_len)
+plot(di_plus + di_minus, display=display.none)  // suprime warning de variavel nao usada
 
 stoch_raw = ta.stoch(close, high, low, stoch_k_len)
 stoch_k   = ta.sma(stoch_raw, stoch_d_len)
 stoch_d   = ta.sma(stoch_k, stoch_sm)
+plot(stoch_d, display=display.none)  // suprime warning de variavel nao usada
 
 // =============================================================================
 // Votos 2-de-3 (RSI + MACD crossover + BB toque)
