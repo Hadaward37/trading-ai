@@ -86,8 +86,6 @@ def _score_series(
     stoch_sell_pts = (stoch_k - config.STOCH_OVERBOUGHT).clip(lower=0) / max(100 - config.STOCH_OVERBOUGHT, 1) * config.SCORE_WEIGHT_STOCH
 
     # ── LSTM (SCORE_WEIGHT_LSTM pts) ──────────────────────────────────────────
-    # lstm_prob is a scalar 0-100 for the LAST bar; broadcast to all rows.
-    # Returns neutral (50) when model not available — contributes 0 net bias.
     lstm_prob = _get_lstm_prob(df)
     lstm_buy_pts  = pd.Series(
         max(lstm_prob - 50, 0) / 50 * config.SCORE_WEIGHT_LSTM, index=df.index
@@ -96,8 +94,17 @@ def _score_series(
         max(50 - lstm_prob, 0) / 50 * config.SCORE_WEIGHT_LSTM, index=df.index
     )
 
-    buy_total  = (rsi_buy_pts  + macd_buy_pts  + bb_buy_pts  + adx_pts + stoch_buy_pts  + lstm_buy_pts ).clip(0, 100)
-    sell_total = (rsi_sell_pts + macd_sell_pts + bb_sell_pts + adx_pts + stoch_sell_pts + lstm_sell_pts).clip(0, 100)
+    # ── XGBoost (SCORE_WEIGHT_XGBOOST pts) ───────────────────────────────────
+    xgb_prob = _get_xgboost_prob(df)
+    xgb_buy_pts  = pd.Series(
+        max(xgb_prob - 50, 0) / 50 * getattr(config, "SCORE_WEIGHT_XGBOOST", 0), index=df.index
+    )
+    xgb_sell_pts = pd.Series(
+        max(50 - xgb_prob, 0) / 50 * getattr(config, "SCORE_WEIGHT_XGBOOST", 0), index=df.index
+    )
+
+    buy_total  = (rsi_buy_pts  + macd_buy_pts  + bb_buy_pts  + adx_pts + stoch_buy_pts  + lstm_buy_pts  + xgb_buy_pts ).clip(0, 100)
+    sell_total = (rsi_sell_pts + macd_sell_pts + bb_sell_pts + adx_pts + stoch_sell_pts + lstm_sell_pts + xgb_sell_pts).clip(0, 100)
 
     return buy_total, sell_total
 
@@ -109,6 +116,17 @@ def _get_lstm_prob(df: pd.DataFrame) -> float:
     try:
         from core.lstm_model import predict as lstm_predict
         return lstm_predict(df)
+    except Exception:
+        return 50.0
+
+
+def _get_xgboost_prob(df: pd.DataFrame) -> float:
+    """Return XGBoost directional probability (0-100). Returns 50 if disabled/unavailable."""
+    if not getattr(config, "XGBOOST_ENABLED", False):
+        return 50.0
+    try:
+        from core.xgboost_model import predict as xgb_predict
+        return xgb_predict(df)
     except Exception:
         return 50.0
 
@@ -178,9 +196,11 @@ def generate_signals_custom(
     buy_votes, sell_votes = _vote_series(df, rsi_buy, rsi_sell)
     buy_score, sell_score = _score_series(df, rsi_buy, rsi_sell)
 
-    # LSTM probability column (scalar broadcast to all rows)
+    # LSTM + XGBoost probability columns (scalar broadcast to all rows)
     lstm_prob = _get_lstm_prob(df)
-    df["lstm_prob"] = round(lstm_prob, 1)
+    xgb_prob  = _get_xgboost_prob(df)
+    df["lstm_prob"]     = round(lstm_prob, 1)
+    df["xgboost_prob"]  = round(xgb_prob,  1)
 
     df["signal"] = 0
     df.loc[buy_votes  >= 2, "signal"] =  1
@@ -190,11 +210,44 @@ def generate_signals_custom(
     if regime == "Range" and config.REGIME_BLOCK_RANGE_SIGNALS:
         df["signal"] = 0
 
+    # Ensemble consensus gate: cancel signal if LSTM and XGBoost disagree
+    if getattr(config, "XGBOOST_REQUIRE_CONSENSUS", False):
+        buy_mask  = df["signal"] ==  1
+        sell_mask = df["signal"] == -1
+        # BUY  valid only if both models bullish (>50)
+        df.loc[buy_mask  & ~((lstm_prob > 50) & (xgb_prob > 50)), "signal"] = 0
+        # SELL valid only if both models bearish (<50)
+        df.loc[sell_mask & ~((lstm_prob < 50) & (xgb_prob < 50)), "signal"] = 0
+
+    df["ensemble_consensus"] = (
+        ((df["signal"] ==  1) & (lstm_prob > 50) & (xgb_prob > 50)) |
+        ((df["signal"] == -1) & (lstm_prob < 50) & (xgb_prob < 50)) |
+        (df["signal"] == 0)
+    )
+
     # Score column — non-zero only where signal fires
     score = pd.Series(0.0, index=df.index)
     score[df["signal"] ==  1] = buy_score[ df["signal"] ==  1]
     score[df["signal"] == -1] = sell_score[df["signal"] == -1]
     df["score"] = score.round(1)
+
+    # Ensemble probability: LSTM(40%) + XGBoost(40%) + tech(20%)
+    lstm_dir = max(lstm_prob - 50, 0) / 50   # 0-1 bullish strength
+    xgb_dir  = max(xgb_prob  - 50, 0) / 50
+    lstm_bear = max(50 - lstm_prob, 0) / 50  # 0-1 bearish strength
+    xgb_bear  = max(50 - xgb_prob,  0) / 50
+
+    ensemble_buy  = pd.Series(0.0, index=df.index)
+    ensemble_sell = pd.Series(0.0, index=df.index)
+    buy_mask  = df["signal"] ==  1
+    sell_mask = df["signal"] == -1
+    ensemble_buy[buy_mask]   = (
+        lstm_dir * 40 + xgb_dir  * 40 + buy_score[ buy_mask]  * 0.20
+    ).clip(0, 100)
+    ensemble_sell[sell_mask] = (
+        lstm_bear * 40 + xgb_bear * 40 + sell_score[sell_mask] * 0.20
+    ).clip(0, 100)
+    df["ensemble_prob"] = (ensemble_buy + ensemble_sell).round(1)
 
     # News filter — always add columns; populate when check_news=True
     df["news_blocked"] = False

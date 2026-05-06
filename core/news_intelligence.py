@@ -1,7 +1,7 @@
-"""News intelligence pipeline — Fase 2.
+"""News intelligence pipeline — Fase 2 + FinBERT.
 
 Coleta    : Yahoo Finance RSS (gratuito, sem API key)
-Análise   : GPT-4o → Groq (Llama 3.3 70B) → Gemini Flash → fallback keyword-based
+Análise   : FinBERT(primary) + Groq(secondary) → GPT-4o → Gemini Flash → keyword fallback
 
 Pipeline:
   _fetch_headlines_rss(ticker)  →  list[str]  — headlines recentes
@@ -16,7 +16,7 @@ Output (NewsAnalysis):
   key_factors         : list[str]
   headlines           : list[str]
   analyzed_at         : datetime (UTC)
-  source              : str   — "gpt4o" | "groq" | "gemini" | "keyword" | "no_data"
+  source              : str   — "finbert+groq" | "finbert" | "groq" | "gpt4o" | "gemini" | "keyword" | "no_data"
   error               : str | None
 """
 
@@ -66,7 +66,7 @@ class NewsAnalysis:
     key_factors: list[str]
     headlines: list[str]
     analyzed_at: datetime = field(default_factory=lambda: datetime.now(tz=timezone.utc))
-    source: str = "no_data"      # gpt4o | gemini | keyword | no_data
+    source: str = "no_data"      # finbert+groq | finbert | groq | gpt4o | gemini | keyword | no_data
     error: Optional[str] = None
 
     def score_adjustment(self, signal: int) -> float:
@@ -137,7 +137,48 @@ def _fetch_headlines_rss(ticker: str, max_items: int = 8) -> list[str]:
         return []
 
 
-# ── Step 2a: análise via GPT-4o ───────────────────────────────────────────────
+# ── Step 2a: análise via FinBERT (NLP financeiro especializado) ───────────────
+
+_SENTIMENT_SCORE = {"BULLISH": 1.0, "BEARISH": -1.0, "NEUTRAL": 0.0}
+
+
+def _analyze_with_finbert(headlines: list[str], ticker: str) -> Optional[NewsAnalysis]:
+    """Classifica sentimento com ProsusAI/FinBERT. Retorna None em falha."""
+    if not getattr(config, "FINBERT_ENABLED", False):
+        return None
+    try:
+        from core.finbert_sentiment import analyze as finbert_analyze
+    except ImportError:
+        return None
+
+    result = finbert_analyze(headlines)
+    if result is None:
+        return None
+
+    sentiment  = result["label"]
+    confidence = result["score"]
+    raw        = result.get("raw_scores", {})
+
+    # Impact derived from confidence level
+    if confidence >= 0.80:
+        impact = "HIGH"
+    elif confidence >= 0.55:
+        impact = "MEDIUM"
+    else:
+        impact = "LOW"
+
+    return NewsAnalysis(
+        ticker     = ticker,
+        sentiment  = sentiment,
+        confidence = confidence,
+        impact     = impact,
+        key_factors= [f"FinBERT: {k}={v:.0%}" for k, v in raw.items()],
+        headlines  = headlines,
+        source     = "finbert",
+    )
+
+
+# ── Step 2b: análise via GPT-4o ──────────────────────────────────────────────
 
 _GPT_SYSTEM = (
     "Você é um analista financeiro quantitativo. "
@@ -328,6 +369,61 @@ def _keyword_sentiment(headlines: list[str], ticker: str) -> NewsAnalysis:
     )
 
 
+# ── Combined analysis: FinBERT(70%) + Groq(30%) ───────────────────────────────
+
+_SENTIMENT_DIR = {"BULLISH": 1.0, "BEARISH": -1.0, "NEUTRAL": 0.0}
+
+
+def _blend_analyses(fb: NewsAnalysis, groq: NewsAnalysis, w_fb: float, w_gr: float) -> NewsAnalysis:
+    """Weighted blend of two NewsAnalysis objects into one."""
+    # Compute directional score for each
+    fb_dir   = _SENTIMENT_DIR.get(fb.sentiment, 0.0)   * fb.confidence
+    gr_dir   = _SENTIMENT_DIR.get(groq.sentiment, 0.0) * groq.confidence
+
+    blended  = fb_dir * w_fb + gr_dir * w_gr
+    conf     = min(1.0, abs(blended) + 0.05)  # slight floor to avoid 0
+
+    if   blended >  0.05: sentiment = "BULLISH"
+    elif blended < -0.05: sentiment = "BEARISH"
+    else:                  sentiment = "NEUTRAL"
+
+    # Use higher-impact label
+    impact_rank = {"HIGH": 3, "MEDIUM": 2, "LOW": 1}
+    impact = fb.impact if impact_rank.get(fb.impact, 0) >= impact_rank.get(groq.impact, 0) else groq.impact
+
+    return NewsAnalysis(
+        ticker     = fb.ticker,
+        sentiment  = sentiment,
+        confidence = round(conf, 4),
+        impact     = impact,
+        key_factors= [f"FinBERT: {fb.sentiment}({fb.confidence:.0%})",
+                      f"Groq: {groq.sentiment}({groq.confidence:.0%})"],
+        headlines  = fb.headlines,
+        source     = "finbert+groq",
+    )
+
+
+def _analyze_combined(headlines: list[str], ticker: str) -> Optional[NewsAnalysis]:
+    """Try FinBERT + Groq first; fall through to GPT-4o → Gemini on failure."""
+    fb_weight = getattr(config, "FINBERT_WEIGHT", 0.70)
+
+    fb_result   = _analyze_with_finbert(headlines, ticker)
+    groq_result = _analyze_with_groq(headlines, ticker)
+
+    if fb_result and groq_result:
+        return _blend_analyses(fb_result, groq_result, fb_weight, 1.0 - fb_weight)
+    if fb_result:
+        return fb_result
+    if groq_result:
+        return groq_result
+
+    # Fall through to other providers
+    return (
+        _analyze_with_gpt(headlines, ticker)
+        or _analyze_with_gemini(headlines, ticker)
+    )
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def get_market_sentiment(ticker: str) -> NewsAnalysis:
@@ -355,12 +451,9 @@ def get_market_sentiment(ticker: str) -> NewsAnalysis:
             source="no_data",
         )
     else:
-        analysis = (
-            _analyze_with_gpt(headlines, ticker)
-            or _analyze_with_groq(headlines, ticker)
-            or _analyze_with_gemini(headlines, ticker)
-            or _keyword_sentiment(headlines, ticker)
-        )
+        analysis = _analyze_combined(headlines, ticker)
+        if analysis is None:
+            analysis = _keyword_sentiment(headlines, ticker)
 
     _cache.set(ticker, analysis)
     logger.info(

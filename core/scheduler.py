@@ -100,6 +100,9 @@ def _build_alert(df, win_rate: float, symbol: str) -> SignalAlert:
         sentiment_confidence  = float(row.get("sentiment_confidence", 0.0)),
         sentiment_impact      = str(row.get("sentiment_impact", "LOW")),
         final_score           = float(row.get("final_score", row.get("score", 0.0))),
+        lstm_prob             = float(row.get("lstm_prob", 50.0)),
+        xgboost_prob          = float(row.get("xgboost_prob", 50.0)),
+        ensemble_prob         = float(row.get("ensemble_prob", 0.0)),
     )
 
 

@@ -1,0 +1,21 @@
+{
+  "trained_at": "2026-05-06T19:05:03.016237+00:00",
+  "n_train": 10472,
+  "n_val": 1848,
+  "val_accuracy": 0.5519,
+  "up_rate": 0.4569,
+  "best_iteration": 9,
+  "features": [
+    "rsi",
+    "macd_hist",
+    "bb_pct",
+    "atr_norm",
+    "adx",
+    "stoch_k",
+    "volume_norm",
+    "sentiment_confidence"
+  ],
+  "n_features": 24,
+  "symbol": "EURUSD",
+  "timeframe": "1h"
+}

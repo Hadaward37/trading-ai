@@ -39,6 +39,9 @@ class SignalAlert:
     final_score:   float = 0.0         # sentiment-adjusted score
     analysis:      str   = ""          # Pythex AI explanation (optional)
     copom_tone:    str   = ""          # hawkish | dovish | neutral (BR assets only)
+    lstm_prob:     float = 50.0        # LSTM UP probability 0-100
+    xgboost_prob:  float = 50.0        # XGBoost UP probability 0-100
+    ensemble_prob: float = 0.0         # ensemble weighted probability 0-100
 
 
 class TelegramNotifier:
@@ -118,6 +121,22 @@ class TelegramNotifier:
             f"🔢 *Score final:*  {score_str}",
             "",
             f"{sent_emoji} *Sentimento:*   `{a.sentiment}` ({sent_conf}% conf · {a.sentiment_impact})",
+        ]
+
+        # ── Ensemble ML block ─────────────────────────────────────────────────
+        lstm_pct    = int(a.lstm_prob)
+        xgb_pct     = int(a.xgboost_prob)
+        consensus   = (
+            (a.signal == "BUY"  and a.lstm_prob > 50 and a.xgboost_prob > 50) or
+            (a.signal == "SELL" and a.lstm_prob < 50 and a.xgboost_prob < 50)
+        )
+        consensus_icon = "✅" if consensus else "⚠️"
+        ensemble_str   = f"`{a.ensemble_prob:.0f}/100`" if a.ensemble_prob > 0 else "`—`"
+
+        lines += [
+            "",
+            f"🤖 *LSTM:* `{lstm_pct}%` | *XGBoost:* `{xgb_pct}%` | *Consenso:* {consensus_icon}",
+            f"📊 *Ensemble prob:* {ensemble_str}",
         ]
 
         if a.copom_tone and a.copom_tone != "neutral":

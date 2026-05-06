@@ -90,19 +90,29 @@ REGIME_BLOCK_RANGE_SIGNALS  = True  # suppress BUY/SELL entries during Range
 MTF_MIN_AGREEMENTS = 2   # number of TFs that must agree for a valid MTF signal
 
 # ── Signal score weights (must sum to 100) ────────────────────────────────────
-# v3 weights (2026-05-06): LSTM added as heaviest component
-SCORE_WEIGHT_RSI   = 20
-SCORE_WEIGHT_MACD  = 20
-SCORE_WEIGHT_BB    = 15
-SCORE_WEIGHT_ADX   = 12
-SCORE_WEIGHT_STOCH = 12
-SCORE_WEIGHT_LSTM  = 21   # LSTM neural net — directional probability
+# v4 weights (2026-05-06): XGBoost ensemble added alongside LSTM
+SCORE_WEIGHT_RSI      = 14
+SCORE_WEIGHT_MACD     = 14
+SCORE_WEIGHT_BB       = 11
+SCORE_WEIGHT_ADX      = 10
+SCORE_WEIGHT_STOCH    = 10
+SCORE_WEIGHT_LSTM     = 20   # LSTM neural net — directional probability
+SCORE_WEIGHT_XGBOOST  = 21   # XGBoost ensemble — directional probability
 
 # ── LSTM model ────────────────────────────────────────────────────────────────
 LSTM_ENABLED     = True
 LSTM_LOOKBACK    = 60    # candles fed to the network
 LSTM_MODEL_PATH  = "models/lstm_eurusd_1h.h5"
 LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
+
+# ── XGBoost ensemble ──────────────────────────────────────────────────────────
+XGBOOST_ENABLED      = True
+XGBOOST_MODEL_PATH   = "models/xgboost_eurusd.pkl"
+XGBOOST_REQUIRE_CONSENSUS = True   # cancel signal if LSTM and XGBoost disagree
+
+# ── FinBERT NLP sentiment ─────────────────────────────────────────────────────
+FINBERT_ENABLED = True
+FINBERT_WEIGHT  = 0.70   # FinBERT 70% + Groq 30% when both available
 
 # ── Copom macro context ───────────────────────────────────────────────────────
 COPOM_ENABLED          = True
