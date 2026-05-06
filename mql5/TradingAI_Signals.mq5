@@ -4,8 +4,8 @@
 //|  and draws entry arrows + SL/TP lines on the active chart.       |
 //|                                                                   |
 //|  Install: copy to MT5 MQL5/Experts/ folder, compile and attach   |
-//|  to the EURUSD H1 chart. Set CsvPath to the absolute path of     |
-//|  data/mt5_signals.csv in your trading-ai project.                |
+//|  to the EURUSD H1 chart. CsvPath default is already set to the   |
+//|  correct location: C:\Users\dudut\trading-ai\data\mt5_signals.csv |
 //+------------------------------------------------------------------+
 #property copyright "trading-ai"
 #property version   "1.00"
