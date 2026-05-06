@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-05-06T20:39:21.200579+00:00",
+  "n_rows": 12321,
+  "features_used": [
+    "rsi",
+    "stoch_k",
+    "macd_hist",
+    "momentum_1h",
+    "momentum_2h",
+    "momentum_3h",
+    "adx",
+    "macd",
+    "atr",
+    "bb_pct",
+    "atr_ratio",
+    "zscore_20",
+    "volume_norm",
+    "hour_sin",
+    "hour_cos",
+    "session_asia",
+    "session_london",
+    "session_ny",
+    "session_overlap"
+  ],
+  "features_removed": [
+    "atr_norm",
+    "macd_signal"
+  ],
+  "top3": [
+    {
+      "N": 2,
+      "k": 0.7,
+      "balanced": true,
+      "mean_exp": 6.51222082493379e-05
+    },
+    {
+      "N": 2,
+      "k": 0.5,
+      "balanced": false,
+      "mean_exp": 3.387019445437752e-05
+    },
+    {
+      "N": 2,
+      "k": 0.7,
+      "balanced": false,
+      "mean_exp": 1.687313722038975e-05
+    }
+  ],
+  "holdout": [
+    {
+      "N": 2,
+      "k": 0.7,
+      "balanced": true,
+      "expectation": 0.00011858336753825711,
+      "profit_factor": 1.164293986767731,
+      "sharpe": 3.366019639315028,
+      "n_trades": 828
+    },
+    {
+      "N": 2,
+      "k": 0.5,
+      "balanced": false,
+      "expectation": 3.2036694116316226e-05,
+      "profit_factor": 1.050346248501207,
+      "sharpe": 1.0676172017670642,
+      "n_trades": 1161
+    },
+    {
+      "N": 2,
+      "k": 0.7,
+      "balanced": false,
+      "expectation": 0.0001712483502734148,
+      "profit_factor": 1.2462909669459028,
+      "sharpe": 4.871995418622612,
+      "n_trades": 828
+    }
+  ]
+}
