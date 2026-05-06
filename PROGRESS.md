@@ -53,6 +53,8 @@
 - [x] Filtro de notícias/eventos econômicos — `core/news_filter.py` (FF JSON + BS4, cache 1h, ±30 min)
 - [x] Ações brasileiras — `config.ASSETS` (VALE3, PETR4, ITUB4, BBDC4, IBOV via yfinance)
 - [x] Integração TradingView / Pine Script — `tradingview/strategy.pine` + `tradingview/indicator.pine`
+- [x] **MetaTrader 5** — `core/mt5_connector.py` (OHLCV M15/H1/H4 ao vivo) + `mql5/TradingAI_Signals.mq5` (EA anota sinais no gráfico)
+- [x] **Pythex Bridge** — `core/pythex_bridge.py` (GPT-4o-mini, análise executiva por sinal, 1 frase ≤200 chars)
 
 ### ✅ Fase 2 — Inteligência de Notícias (concluída 2026-05-05)
 - [x] **Groq API (Llama 3.3 70B)** — análise de sentimento gratuita (14.400 req/dia)
@@ -65,6 +67,17 @@
 
 > **Nota:** GPT-4o e Gemini pendentes de créditos — Groq substituindo gratuitamente com qualidade equivalente.
 > Prioridade de engines: GPT-4o → Groq → Gemini → keyword fallback
+
+### ✅ Fase 7 — MetaTrader 5 + Pythex IA (concluída 2026-05-06)
+- [x] **MT5 conectado** — `core/mt5_connector.py` busca OHLCV ao vivo (M15/H1/H4) via API Python
+- [x] **Sinais exportados** — `data/mt5_signals.csv` + `data/mt5_signals.json` (310 sinais gerados)
+- [x] **EA MQL5** — `mql5/TradingAI_Signals.mq5` lê CSV a cada 15s e desenha setas de entrada, linhas SL/TP e score no gráfico MT5
+- [x] **Pythex integrado** — `core/pythex_bridge.py` como base de conhecimento de trading
+- [x] **GPT-4o-mini** — análise executiva gerada por sinal (max 55 tokens, 1 frase ≤200 chars)
+- [x] **Telegram com análise** — campo `analysis` em `SignalAlert`, bloco "Analise Pythex" no alerta
+- [x] **Conta demo MetaQuotes** — MT5 instalado e conectado localmente
+
+> Configuração: `USE_MT5 = True` em `config.py` · EA em `MQL5/Experts/TradingAI_Signals.mq5`
 
 ### 🚀 Fase 5 — Paper Trading e Validação (iniciada 2026-05-05)
 - [x] **Paper trading implementado** — `core/paper_trading.py` com SQLite WAL
@@ -94,8 +107,16 @@ trading-ai/
 │   ├── news_intelligence.py # Fase 2: RSS + Groq/GPT/Gemini → sentimento
 │   ├── paper_trading.py     # Fase 5: carteira virtual, SL/TP, métricas
 │   ├── trade_journal.py     # Fase 5: CSV diário, resumo do dia
-│   ├── notifier.py          # TelegramNotifier (inclui sentimento)
-│   └── scheduler.py         # Loop 15min, paper trading integrado
+│   ├── notifier.py          # TelegramNotifier (sentimento + análise Pythex)
+│   ├── scheduler.py         # Loop 15min, paper trading integrado
+│   ├── mt5_connector.py     # Fase 7: MT5 OHLCV ao vivo (M15/H1/H4)
+│   ├── mt5_signals.py       # Fase 7: exporta sinais → CSV/JSON para o EA
+│   └── pythex_bridge.py     # Fase 7: GPT-4o-mini análise executiva por sinal
+├── mql5/
+│   └── TradingAI_Signals.mq5  # EA MT5: lê CSV e anota sinais no gráfico
+├── scripts/
+│   ├── run_pipeline.py      # Pipeline MT5 completo (dados → sinais → CSV)
+│   └── test_pythex_telegram.py  # Teste: bridge + Telegram
 ├── db/
 │   └── database.py          # SQLAlchemy + SQLite
 ├── dashboard/
