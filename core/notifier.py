@@ -37,6 +37,7 @@ class SignalAlert:
     sentiment_confidence: float = 0.0  # 0.0–1.0
     sentiment_impact:     str   = "LOW"
     final_score:   float = 0.0         # sentiment-adjusted score
+    analysis:      str   = ""          # Pythex AI explanation (optional)
 
 
 class TelegramNotifier:
@@ -117,6 +118,10 @@ class TelegramNotifier:
             "",
             f"{sent_emoji} *Sentimento:*   `{a.sentiment}` ({sent_conf}% conf · {a.sentiment_impact})",
         ]
+
+        if a.analysis:
+            lines += ["", f"🧠 *Analise Pythex:* _{a.analysis}_"]
+
         return "\n".join(lines)
 
     def _send(self, text: str, parse_mode: str | None = "Markdown") -> bool:
