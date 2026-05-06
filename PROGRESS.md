@@ -56,6 +56,7 @@
 - [x] **MetaTrader 5** — `core/mt5_connector.py` (OHLCV M15/H1/H4 ao vivo) + `mql5/TradingAI_Signals.mq5` (EA anota sinais no gráfico)
 - [x] **Pythex Bridge** — `core/pythex_bridge.py` (GPT-4o-mini, análise executiva por sinal, 1 frase ≤200 chars)
 - [x] **LSTM Neural Network** — `core/lstm_model.py` + `core/lstm_trainer.py` (55.41% acurácia, 12.260 amostras, retreino semanal automático)
+- [x] **RAG Copom** — `core/macro_context.py` + `scripts/ingest_copom.py` (BCB API, tom DOVISH detectado, +10/-10 pts em ações BR)
 
 ### ✅ Fase 2 — Inteligência de Notícias (concluída 2026-05-05)
 - [x] **Groq API (Llama 3.3 70B)** — análise de sentimento gratuita (14.400 req/dia)
@@ -92,6 +93,20 @@
 
 > Acurácia melhora com mais dados acumulados pelo scheduler (meta: >58% com 6+ meses de candles)
 > Retreinar manualmente: `.\venv\Scripts\python.exe -m core.lstm_trainer --force`
+
+### ✅ Fase 9 — RAG Copom / Contexto Macro BR (concluída 2026-05-06)
+- [x] **Fonte de dados** — BCB API oficial (`api.bcb.gov.br/dados/serie/bcdata.sgs.4189`) — SELIC meta, sempre disponível
+- [x] **Tom detectado: DOVISH** — Selic caindo de 14.90% → 14.40% (delta -0.29pp em 3 meses)
+- [x] **GPT-4o-mini** confirma tom em 1 token a partir da trajetória da taxa
+- [x] **Score BR ajustado** — `+10 pts` dovish | `-10 pts` hawkish nos ativos VALE3/PETR4/ITUB4/BBDC4/IBOV
+- [x] **EUR/USD isolado** — Copom não afeta Forex (verificado via `BR_SYMBOLS`)
+- [x] **Cache 6h** — `data/copom_tone.json` evita chamadas excessivas à BCB API
+- [x] **ChromaDB Pythex** — contexto salvo em `pythex-ia-engine/clientes/copom/pdfs/` para RAG queries
+- [x] **Telegram com linha Copom** — emoji 🕊/🦅 + tom + Selic em cada alerta de ativo BR
+- [x] **PDFs automáticos** — slot preparado para quando o BCB disponibilizar URLs diretas (SPA Angular atual bloqueia scraping)
+
+> Tom atual: DOVISH | Selic 14.40% aa | Ações BR: impacto positivo
+> Atualizar: `.\venv\Scripts\python.exe scripts\ingest_copom.py --force`
 
 ### 🚀 Fase 5 — Paper Trading e Validação (iniciada 2026-05-05)
 - [x] **Paper trading implementado** — `core/paper_trading.py` com SQLite WAL
@@ -164,6 +179,10 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 # LSTM — treinar / retreinar
 .\venv\Scripts\python.exe -m core.lstm_trainer          # treina se ainda não existir
 .\venv\Scripts\python.exe -m core.lstm_trainer --force  # força retreino
+
+# Copom — atualizar tom macro
+.\venv\Scripts\python.exe scripts\ingest_copom.py        # usa cache se fresco (<6h)
+.\venv\Scripts\python.exe scripts\ingest_copom.py --force  # força re-fetch BCB + LLM
 
 # Pipeline MT5 (dados ao vivo → sinais → CSV)
 .\venv\Scripts\python.exe scripts\run_pipeline.py
