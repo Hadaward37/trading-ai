@@ -55,6 +55,7 @@
 - [x] Integração TradingView / Pine Script — `tradingview/strategy.pine` + `tradingview/indicator.pine`
 - [x] **MetaTrader 5** — `core/mt5_connector.py` (OHLCV M15/H1/H4 ao vivo) + `mql5/TradingAI_Signals.mq5` (EA anota sinais no gráfico)
 - [x] **Pythex Bridge** — `core/pythex_bridge.py` (GPT-4o-mini, análise executiva por sinal, 1 frase ≤200 chars)
+- [x] **LSTM Neural Network** — `core/lstm_model.py` + `core/lstm_trainer.py` (55.41% acurácia, 12.260 amostras, retreino semanal automático)
 
 ### ✅ Fase 2 — Inteligência de Notícias (concluída 2026-05-05)
 - [x] **Groq API (Llama 3.3 70B)** — análise de sentimento gratuita (14.400 req/dia)
@@ -78,6 +79,19 @@
 - [x] **Conta demo MetaQuotes** — MT5 instalado e conectado localmente
 
 > Configuração: `USE_MT5 = True` em `config.py` · EA em `MQL5/Experts/TradingAI_Signals.mq5`
+
+### ✅ Fase 8 — LSTM Neural Network (concluída 2026-05-06)
+- [x] **Modelo LSTM** — arquitetura LSTM(64)→Dropout→LSTM(32)→Dropout→Dense(1,sigmoid)
+- [x] **Features (8)** — RSI, MACD_hist, BB_pct, ATR_norm, ADX, Stoch_K, Volume_norm, Sentiment_conf
+- [x] **Treinamento** — 12.260 amostras de signals_1h SQLite | split cronológico (sem lookahead)
+- [x] **Acurácia inicial: 55.41%** — +5.4% acima do baseline aleatório de 50%
+- [x] **Pesos v3** — RSI(20%) + MACD(20%) + BB(15%) + ADX(12%) + Stoch(12%) + **LSTM(21%)** = 100%
+- [x] **Retreino automático semanal** — `should_retrain()` detecta modelo com >7 dias
+- [x] **Dashboard aba LSTM** — gauge de probabilidade de alta, acurácia por epoch, pizza de pesos, botão de retreino
+- [x] **Fallback seguro** — retorna 50% (neutro) quando modelo indisponível; não bloqueia sinais
+
+> Acurácia melhora com mais dados acumulados pelo scheduler (meta: >58% com 6+ meses de candles)
+> Retreinar manualmente: `.\venv\Scripts\python.exe -m core.lstm_trainer --force`
 
 ### 🚀 Fase 5 — Paper Trading e Validação (iniciada 2026-05-05)
 - [x] **Paper trading implementado** — `core/paper_trading.py` com SQLite WAL
@@ -146,6 +160,13 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 
 # Optimizer
 .\venv\Scripts\python -m core.optimizer
+
+# LSTM — treinar / retreinar
+.\venv\Scripts\python.exe -m core.lstm_trainer          # treina se ainda não existir
+.\venv\Scripts\python.exe -m core.lstm_trainer --force  # força retreino
+
+# Pipeline MT5 (dados ao vivo → sinais → CSV)
+.\venv\Scripts\python.exe scripts\run_pipeline.py
 
 # Testes
 .\venv\Scripts\pytest tests/ -v
