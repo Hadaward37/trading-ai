@@ -27,6 +27,7 @@ from core.news_filter import is_danger_zone
 from core.notifier import SignalAlert, TelegramNotifier
 from core.paper_trading import VirtualPortfolio
 from core.signals import generate_signals_custom
+from core.telemetry import get_telemetry
 from core.trade_journal import export_daily_csv, print_daily_summary
 from db.database import save_ohlcv, save_signals
 
@@ -172,12 +173,46 @@ def _run_asset(
             f"{float(last_row['close']):.{meta['decimals']}f}", bt.win_rate,
         )
 
+        # ── Telemetry: record every signal + regime filter observation ────────
+        if cur_signal != 0:
+            try:
+                atr_val   = float(last_row.get("atr", 0.001))
+                atr_ma    = float(df["atr"].iloc[-22:-2].mean()) if len(df) > 22 else atr_val
+                atr_ratio = atr_val / max(atr_ma, 1e-9)
+                get_telemetry().record_signal(
+                    symbol    = symbol,
+                    name      = name,
+                    signal    = cur_name,
+                    price     = float(last_row["close"]),
+                    adx       = float(last_row.get("adx", 0)),
+                    atr_ratio = atr_ratio,
+                    hour_utc  = last_row.name.hour if hasattr(last_row.name, "hour") else 12,
+                )
+            except Exception:
+                pass
+
         # ── Paper trading — checar SL/TP e abrir novas posições ──────────────
         if portfolio and config.PAPER_TRADING_ENABLED:
             # 1. Verificar se posição aberta atingiu SL ou TP
             closed_trades = portfolio.check_and_close(symbol, df)
             for ct in closed_trades:
                 _send_close_alert(notifier, ct)
+                # Telemetry: record trade outcome
+                try:
+                    direction = ct.get("direction", "BUY")
+                    pf_alert  = get_telemetry().record_trade_outcome(
+                        symbol      = symbol,
+                        direction   = direction,
+                        entry_price = float(ct.get("entry_price", 0)),
+                        exit_price  = float(ct.get("exit_price", 0)),
+                        pnl         = float(ct.get("pnl", 0)),
+                        pnl_pct     = float(ct.get("pnl_pct", 0)),
+                        hour_utc    = datetime.now().hour,
+                    )
+                    if pf_alert:
+                        notifier.send_text(pf_alert)
+                except Exception:
+                    pass
 
             # 2. Abrir nova posição se sinal mudou (e não bloqueado por news)
             if cur_signal != 0 and cur_signal != last_signal:
@@ -226,6 +261,15 @@ def _run_asset(
             logger.info("[%s] Signal cleared -> HOLD", name)
         else:
             logger.info("[%s] No signal change — skipping", name)
+
+        # ── Telemetry: resolve blocked signal hypothetical outcomes ──────────
+        if symbol == config.SYMBOL:   # EUR/USD only — regime filter tested on EUR/USD
+            try:
+                blocked_alerts = get_telemetry().resolve_blocked_outcomes(df)
+                for balert in blocked_alerts:
+                    notifier.send_text(balert)
+            except Exception:
+                pass
 
         return cur_signal
 

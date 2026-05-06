@@ -191,6 +191,71 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 .\venv\Scripts\pytest tests/ -v
 ```
 
+---
+
+## 🔒 FASE DE INCUBAÇÃO — Sistema Congelado (2026-05-06 a 2026-06-06)
+
+**Status:** Sistema CONGELADO por 30 dias para observação ao vivo.
+**Regra absoluta:** nenhuma alteração em modelo, features, target, thresholds ou filtros.
+
+### O que foi validado (experimentos quantitativos)
+
+| Módulo | Resultado |
+|--------|-----------|
+| **Auditoria leakage** | LSTM: scaler bug corrigido (fit em treino apenas). XGBoost: limpo. |
+| **Walk-forward 3 folds** | N=2H k=0.7: E=+0.0001 a +0.0002, PF=1.16–1.25, Sharpe>3 |
+| **Anti-snooping holdout** | 3/3 combos sobrevivem (100%), Sharpe 3.37–4.87 |
+| **Filtro de regime** | ADX<35 + atr_ratio=(0.8,1.5) → Holdout: PF 1.16→1.43, Sharpe 3.37→7.15 |
+| **SHAP consistência** | Features estáveis: `atr_ratio`, `adx`, `bb_pct`, `momentum_3h`, `atr`, `macd_hist` |
+| **IBOV paralelo** | N=2H k=0.7: E=+0.0006→+0.0012, PF 1.17→1.32 com filtro |
+
+### Diagnóstico Fold1 (período tóxico set2024–fev2025)
+
+| Causa | Fold1 | Holdout | Status |
+|-------|-------|---------|--------|
+| EMA200 slope | -0.289 pips/candle (downtrend) | +0.026 (flat) | **TOXIC** |
+| Max unidirectional | 191 pips | 159 pips | **TOXIC** |
+| ADX>35 freq | 14.3% | 19.0% | similar |
+
+**Conclusão:** Fold1 falhou por forte viés direcional (EUR/USD em tendência de baixa). Sinais de reversão (RSI oversold + BB touch) foram penalizados pela tendência persistente. O filtro ADX<35 é uma medida paliativa — o root cause é o regime macro direcional.
+
+### Configuração congelada
+
+```python
+# Melhores combos validados (NÃO ALTERAR)
+# N=2H, k=0.7, balanced=True  → E=+0.0001 sel | E=+0.0003 holdout | PF=1.432 | Sharpe=7.15
+# N=2H, k=0.7, balanced=False → E=+0.0002 sel | E=+0.0003 holdout | PF=1.402 | Sharpe=6.72
+
+# Filtro de regime (observacional — não bloqueia trades ainda)
+REGIME_ADX_THRESHOLD  = 35.0
+REGIME_ATR_RATIO_MIN  = 0.8
+REGIME_ATR_RATIO_MAX  = 1.5
+```
+
+### O que a telemetria monitora (data/telemetry.json)
+
+- Todo sinal gerado + se regime filter teria bloqueado
+- Para sinais bloqueados: resultado hipotético 2H depois (ganho ou perda)
+- PF rolling dos últimos 20 trades (alerta se < 1.0)
+- Drawdown diário + breakdown por sessão (Ásia/Londres/NY)
+- Slippage real vs backtest
+
+### Alertas Telegram automáticos
+
+| Condição | Mensagem |
+|----------|----------|
+| PF rolling < 1.0 | ⚠️ PF Rolling caiu abaixo de 1.0 — monitorar |
+| Trade bloqueado resolvido | ✅ Trade bloqueado pelo filtro — seria GANHO/PERDA (+X pips) |
+
+### Decisão pós-incubação (2026-06-06)
+
+- **Se filtro acertou ≥65% dos bloqueios** → Ativar filtro em produção
+- **Se PF rolling > 1.2 sem filtro** → Manter sistema atual, filtro optional
+- **Se PF rolling < 0.8** → Investigar regime shift antes de qualquer mudança
+- **Nunca retreinar** sem nova auditoria walk-forward completa
+
+---
+
 ## Próximos Passos
 
 ### Fase 3 — Validação de Risco com Claude API
