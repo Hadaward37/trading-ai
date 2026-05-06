@@ -34,7 +34,7 @@ _DB_PATH     = _ROOT / "data" / "trading.db"
 
 _SYSTEM_PROMPT = """\
 Você é o Pythex Trading Analyst, especialista em análise técnica de Forex.
-Responda em no máximo 2 frases curtas, máximo 200 caracteres, SEM markdown, em português.
+Responda com UMA frase completa, máximo 150 caracteres, SEM markdown, em português.
 Base sua análise APENAS no contexto fornecido — indicadores, histórico de sinais e journal de trades.
 Não invente dados. Se não souber, diga "dados insuficientes".
 """
@@ -123,7 +123,7 @@ def load_context() -> str:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def query(question: str, max_chars: int = 280) -> str:
+def query(question: str, max_chars: int = 200) -> str:
     """Ask the Pythex LLM a question about the current trading context.
 
     Args:
@@ -150,11 +150,16 @@ def query(question: str, max_chars: int = 280) -> str:
         resp = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             messages=messages,
-            max_tokens=120,
+            max_tokens=55,
             temperature=0,
         )
+        import re as _re
         answer = resp.choices[0].message.content.strip()
-        # Trim to max_chars without cutting mid-word
+        # Keep only the first complete sentence (period/!/? followed by space or end)
+        m = _re.search(r"[.!?](?=\s|$)", answer)
+        if m:
+            answer = answer[: m.end()].strip()
+        # Hard cap as last resort
         if len(answer) > max_chars:
             answer = answer[:max_chars].rsplit(" ", 1)[0] + "..."
         return answer
