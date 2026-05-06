@@ -75,37 +75,49 @@ def load_training_data() -> tuple[np.ndarray, np.ndarray]:
 
     logger.info("Loaded %d rows from signals_1h", len(df))
 
-    # Build normalised feature matrix
-    feats = _build_features(df)
-    if feats is None:
+    # Build raw feature matrix (unscaled)
+    feats_raw = _build_features(df)
+    if feats_raw is None:
         raise RuntimeError("Feature extraction failed — check column names.")
-
-    # Scale features
-    from sklearn.preprocessing import StandardScaler
-    import joblib
-
-    scaler = StandardScaler()
-    feats  = scaler.fit_transform(feats).astype(np.float32)
-    SCALER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(scaler, SCALER_PATH)
-    logger.info("Scaler saved to %s", SCALER_PATH)
 
     # Target: close[t+1] > close[t]
     close = df["close"].values
     y_raw = (close[1:] > close[:-1]).astype(np.float32)
 
-    # Build sliding windows
-    n_samples = len(feats) - LOOKBACK - 1
-    X = np.zeros((n_samples, LOOKBACK, N_FEATURES), dtype=np.float32)
-    y = np.zeros(n_samples, dtype=np.float32)
+    # Build sliding windows BEFORE scaling
+    n_samples = len(feats_raw) - LOOKBACK - 1
+    X_raw = np.zeros((n_samples, LOOKBACK, N_FEATURES), dtype=np.float32)
+    y     = np.zeros(n_samples, dtype=np.float32)
 
     for i in range(n_samples):
-        X[i] = feats[i : i + LOOKBACK]
-        y[i] = y_raw[i + LOOKBACK]
+        X_raw[i] = feats_raw[i : i + LOOKBACK]
+        y[i]     = y_raw[i + LOOKBACK]
 
     logger.info("Dataset: %d samples | UP=%.1f%% DOWN=%.1f%%",
                 n_samples, y.mean() * 100, (1 - y.mean()) * 100)
-    return X, y
+
+    # ── Chronological split BEFORE fitting scaler (prevents leakage) ──────────
+    n_val   = int(n_samples * VAL_SPLIT)
+    n_train = n_samples - n_val
+    X_train_raw = X_raw[:n_train]
+    X_val_raw   = X_raw[n_train:]
+    y_train_raw = y[:n_train]
+    y_val_raw   = y[n_train:]
+
+    # Fit scaler ONLY on training windows (flattened to 2D)
+    from sklearn.preprocessing import StandardScaler
+    import joblib
+
+    X_tr_2d = X_train_raw.reshape(-1, N_FEATURES)
+    scaler  = StandardScaler()
+    X_tr_sc = scaler.fit_transform(X_tr_2d).reshape(n_train, LOOKBACK, N_FEATURES).astype(np.float32)
+    X_va_sc = scaler.transform(X_val_raw.reshape(-1, N_FEATURES)).reshape(n_val, LOOKBACK, N_FEATURES).astype(np.float32)
+
+    SCALER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, SCALER_PATH)
+    logger.info("Scaler (fit on train only) saved to %s", SCALER_PATH)
+
+    return X_tr_sc, y_train_raw, X_va_sc, y_val_raw
 
 
 # ── Training ──────────────────────────────────────────────────────────────────
@@ -123,15 +135,8 @@ def train(force: bool = False) -> dict:
         return {}
 
     logger.info("Starting LSTM training...")
-    X, y = load_training_data()
-
-    # Chronological split (no shuffle — avoids lookahead bias)
-    n        = len(X)
-    n_val    = int(n * VAL_SPLIT)
-    n_train  = n - n_val
-
-    X_train, y_train = X[:n_train], y[:n_train]
-    X_val,   y_val   = X[n_train:], y[n_train:]
+    X_train, y_train, X_val, y_val = load_training_data()
+    n_train, n_val = len(X_train), len(X_val)
     logger.info("Train: %d | Val: %d", n_train, n_val)
 
     import tensorflow as tf
