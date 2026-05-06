@@ -1,0 +1,193 @@
+{
+  "generated_at": "2026-05-06T22:34:50.074816+00:00",
+  "final_filters": {
+    "N=2H k=0.7 bal=Y": {
+      "adx_threshold": 35,
+      "atr_ratio_min": 0.8,
+      "atr_ratio_max": 1.5,
+      "description": "ADX<35 | atr_ratio in (0.8, 1.5)"
+    },
+    "N=2H k=0.5 bal=N": {
+      "adx_threshold": 35,
+      "atr_ratio_min": 0.8,
+      "atr_ratio_max": 1.5,
+      "description": "ADX<35 | atr_ratio in (0.8, 1.5)"
+    },
+    "N=2H k=0.7 bal=N": {
+      "adx_threshold": 35,
+      "atr_ratio_min": 0.8,
+      "atr_ratio_max": 1.5,
+      "description": "ADX<35 | atr_ratio in (0.8, 1.5)"
+    }
+  },
+  "folds": [
+    {
+      "fold": "Fold1",
+      "combo": "N=2H k=0.7 bal=Y",
+      "retention_pct": 0.8293,
+      "e_before": -6.9e-05,
+      "e_after": -8.8e-05,
+      "pf_before": 0.9263,
+      "pf_after": 0.905,
+      "sharpe_before": -1.6546,
+      "sharpe_after": -2.0944,
+      "maxdd_before": -1.0652,
+      "maxdd_after": -0.9511,
+      "valid": false
+    },
+    {
+      "fold": "Fold2",
+      "combo": "N=2H k=0.7 bal=Y",
+      "retention_pct": 0.8081,
+      "e_before": 0.000178,
+      "e_after": 0.000206,
+      "pf_before": 1.1777,
+      "pf_after": 1.2125,
+      "sharpe_before": 3.6775,
+      "sharpe_after": 3.883,
+      "maxdd_before": -0.4965,
+      "maxdd_after": -0.7361,
+      "valid": true
+    },
+    {
+      "fold": "Fold3",
+      "combo": "N=2H k=0.7 bal=Y",
+      "retention_pct": 0.8026,
+      "e_before": 8.6e-05,
+      "e_after": -5e-06,
+      "pf_before": 1.1209,
+      "pf_after": 0.9934,
+      "sharpe_before": 2.5008,
+      "sharpe_after": -0.1426,
+      "maxdd_before": -0.3268,
+      "maxdd_after": -0.5611,
+      "valid": false
+    },
+    {
+      "fold": "Holdout",
+      "combo": "N=2H k=0.7 bal=Y",
+      "retention_pct": 0.6614,
+      "e_before": 0.000119,
+      "e_after": 0.000292,
+      "pf_before": 1.1643,
+      "pf_after": 1.4322,
+      "sharpe_before": 3.366,
+      "sharpe_after": 7.1517,
+      "maxdd_before": -0.424,
+      "maxdd_after": -0.321,
+      "valid": true
+    },
+    {
+      "fold": "Fold1",
+      "combo": "N=2H k=0.5 bal=N",
+      "retention_pct": 0.8033,
+      "e_before": -4.9e-05,
+      "e_after": -8.7e-05,
+      "pf_before": 0.939,
+      "pf_after": 0.8951,
+      "sharpe_before": -1.3352,
+      "sharpe_after": -2.2662,
+      "maxdd_before": -1.3313,
+      "maxdd_after": -1.2261,
+      "valid": false
+    },
+    {
+      "fold": "Fold2",
+      "combo": "N=2H k=0.5 bal=N",
+      "retention_pct": 0.69,
+      "e_before": 6.1e-05,
+      "e_after": 8.7e-05,
+      "pf_before": 1.0682,
+      "pf_after": 1.0961,
+      "sharpe_before": 1.4563,
+      "sharpe_after": 1.6671,
+      "maxdd_before": -0.9639,
+      "maxdd_after": -0.9836,
+      "valid": false
+    },
+    {
+      "fold": "Fold3",
+      "combo": "N=2H k=0.5 bal=N",
+      "retention_pct": 0.8057,
+      "e_before": 9e-05,
+      "e_after": 6e-05,
+      "pf_before": 1.1509,
+      "pf_after": 1.0962,
+      "sharpe_before": 3.0175,
+      "sharpe_after": 1.9552,
+      "maxdd_before": -0.5162,
+      "maxdd_after": -0.656,
+      "valid": false
+    },
+    {
+      "fold": "Holdout",
+      "combo": "N=2H k=0.5 bal=N",
+      "retention_pct": 0.595,
+      "e_before": 3.2e-05,
+      "e_after": 9.7e-05,
+      "pf_before": 1.0503,
+      "pf_after": 1.14,
+      "sharpe_before": 1.0676,
+      "sharpe_after": 2.7199,
+      "maxdd_before": -0.6268,
+      "maxdd_after": -0.6152,
+      "valid": false
+    },
+    {
+      "fold": "Fold1",
+      "combo": "N=2H k=0.7 bal=N",
+      "retention_pct": 0.8029,
+      "e_before": -0.000166,
+      "e_after": -0.000201,
+      "pf_before": 0.8313,
+      "pf_after": 0.8001,
+      "sharpe_before": -3.992,
+      "sharpe_after": -4.6365,
+      "maxdd_before": -2.0131,
+      "maxdd_after": -1.9518,
+      "valid": false
+    },
+    {
+      "fold": "Fold2",
+      "combo": "N=2H k=0.7 bal=N",
+      "retention_pct": 0.8171,
+      "e_before": 0.000216,
+      "e_after": 0.000266,
+      "pf_before": 1.2197,
+      "pf_after": 1.283,
+      "sharpe_before": 4.4649,
+      "sharpe_after": 4.8861,
+      "maxdd_before": -0.4649,
+      "maxdd_after": -0.3718,
+      "valid": true
+    },
+    {
+      "fold": "Fold3",
+      "combo": "N=2H k=0.7 bal=N",
+      "retention_pct": 0.8026,
+      "e_before": -0.0,
+      "e_after": -2.3e-05,
+      "pf_before": 0.9999,
+      "pf_after": 0.9705,
+      "sharpe_before": -0.0014,
+      "sharpe_after": -0.6427,
+      "maxdd_before": -0.6439,
+      "maxdd_after": -0.6719,
+      "valid": false
+    },
+    {
+      "fold": "Holdout",
+      "combo": "N=2H k=0.7 bal=N",
+      "retention_pct": 0.6614,
+      "e_before": 0.000171,
+      "e_after": 0.000274,
+      "pf_before": 1.2463,
+      "pf_after": 1.4017,
+      "sharpe_before": 4.872,
+      "sharpe_after": 6.7236,
+      "maxdd_before": -0.6537,
+      "maxdd_after": -0.6742,
+      "valid": true
+    }
+  ]
+}
