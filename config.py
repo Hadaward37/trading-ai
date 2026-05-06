@@ -104,6 +104,12 @@ LSTM_LOOKBACK    = 60    # candles fed to the network
 LSTM_MODEL_PATH  = "models/lstm_eurusd_1h.h5"
 LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
 
+# ── Copom macro context ───────────────────────────────────────────────────────
+COPOM_ENABLED          = True
+COPOM_DOVISH_BONUS     = 10.0  # pts added to buy score for BR assets when dovish
+COPOM_HAWKISH_PENALTY  = 10.0  # pts removed from buy score for BR assets when hawkish
+COPOM_TONE_TTL_HOURS   = 6     # refresh interval for copom_tone.json
+
 # ── Backtest defaults (optimised) ─────────────────────────────────────────────
 INITIAL_CAPITAL   = 10_000.0
 POSITION_SIZE_PCT = 0.10

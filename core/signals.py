@@ -232,4 +232,40 @@ def generate_signals_custom(
                 df.loc[signal_mask, "score"] + adjustments
             ).clip(0, 100).round(1)
 
+    # ── Copom macro context (Brazilian assets only) ───────────────────────────
+    df["copom_tone"]       = "neutral"
+    df["copom_adjustment"] = 0.0
+
+    if getattr(config, "COPOM_ENABLED", False) and ticker:
+        _apply_copom_adjustment(df, ticker)
+
     return df
+
+
+def _apply_copom_adjustment(df: "pd.DataFrame", ticker: str) -> None:
+    """In-place: apply Copom score adjustment to final_score for BR assets."""
+    try:
+        from core.macro_context import copom_score_adjustment, get_copom_context, BR_SYMBOLS
+        import config as _cfg
+
+        # Map ticker name to yfinance symbol
+        symbol = _cfg.ASSETS.get(ticker, ticker)
+        if symbol not in BR_SYMBOLS:
+            return   # EUR/USD and other non-BR assets unaffected
+
+        ctx  = get_copom_context()
+        tone = ctx.get("copom_tone", "neutral")
+        df["copom_tone"] = tone
+
+        signal_mask = df["signal"] != 0
+        if signal_mask.any():
+            adj = df.loc[signal_mask, "signal"].apply(
+                lambda s: copom_score_adjustment(symbol, int(s))
+            )
+            df.loc[signal_mask, "copom_adjustment"] = adj
+            df.loc[signal_mask, "final_score"] = (
+                df.loc[signal_mask, "final_score"] + adj
+            ).clip(0, 100).round(1)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning("Copom adjustment failed: %s", exc)

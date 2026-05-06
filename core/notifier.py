@@ -38,6 +38,7 @@ class SignalAlert:
     sentiment_impact:     str   = "LOW"
     final_score:   float = 0.0         # sentiment-adjusted score
     analysis:      str   = ""          # Pythex AI explanation (optional)
+    copom_tone:    str   = ""          # hawkish | dovish | neutral (BR assets only)
 
 
 class TelegramNotifier:
@@ -118,6 +119,11 @@ class TelegramNotifier:
             "",
             f"{sent_emoji} *Sentimento:*   `{a.sentiment}` ({sent_conf}% conf · {a.sentiment_impact})",
         ]
+
+        if a.copom_tone and a.copom_tone != "neutral":
+            from core.macro_context import TONE_LABEL, TONE_EMOJI
+            tone_line = f"{TONE_EMOJI.get(a.copom_tone, '⚖️')} *Copom:* `{TONE_LABEL.get(a.copom_tone, a.copom_tone)}`"
+            lines += ["", tone_line]
 
         if a.analysis:
             lines += ["", f"🧠 *Analise Pythex:* _{a.analysis}_"]
