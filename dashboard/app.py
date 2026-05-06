@@ -27,6 +27,7 @@ from core.paper_trading import VirtualPortfolio
 from core.regime import detect_regime, regime_color, regime_emoji
 from core.signals import generate_signals_custom
 from core.trade_journal import daily_summary, export_daily_csv
+from core.lstm_trainer import load_metrics as lstm_load_metrics
 from db.database import save_ohlcv, save_signals
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -118,7 +119,7 @@ result = run_backtest(df, initial_capital=float(initial_capital),
 d = meta["decimals"]
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_signals, tab_paper = st.tabs(["📈 Sinais & Análise", "💼 Paper Trading"])
+tab_signals, tab_lstm, tab_paper = st.tabs(["📈 Sinais & Análise", "🤖 LSTM", "💼 Paper Trading"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -349,7 +350,139 @@ with tab_signals:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Paper Trading
+# TAB 2 — LSTM Neural Network
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_lstm:
+    st.subheader("🤖 LSTM — Rede Neural de Direção do Próximo Candle")
+
+    lstm_prob_val = float(df.iloc[-1].get("lstm_prob", 50.0))
+    lstm_metrics  = lstm_load_metrics()
+
+    # ── LSTM probability gauge ────────────────────────────────────────────────
+    col_gauge, col_meta = st.columns([1, 2])
+
+    with col_gauge:
+        direction_label = "ALTA" if lstm_prob_val > 55 else ("BAIXA" if lstm_prob_val < 45 else "NEUTRO")
+        gauge_color     = "#26a69a" if lstm_prob_val > 55 else ("#ef5350" if lstm_prob_val < 45 else "#ff9800")
+
+        gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=lstm_prob_val,
+            delta={"reference": 50, "increasing": {"color": "#26a69a"}, "decreasing": {"color": "#ef5350"}},
+            number={"suffix": "%", "font": {"size": 36}},
+            title={"text": f"Prob. de Alta<br><b style='color:{gauge_color}'>{direction_label}</b>"},
+            gauge={
+                "axis": {"range": [0, 100], "tickwidth": 1},
+                "bar":  {"color": gauge_color},
+                "steps": [
+                    {"range": [0,  40], "color": "#2c1a1a"},
+                    {"range": [40, 60], "color": "#1e1e1e"},
+                    {"range": [60, 100],"color": "#1a2c1a"},
+                ],
+                "threshold": {"line": {"color": "white", "width": 2}, "value": 50},
+            },
+        ))
+        gauge.update_layout(template="plotly_dark", height=280,
+                            margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(gauge, use_container_width=True)
+
+    with col_meta:
+        if lstm_metrics:
+            acc   = lstm_metrics.get("val_accuracy", 0)
+            loss  = lstm_metrics.get("val_loss", 0)
+            epoch = lstm_metrics.get("best_epoch", "?")
+            total = lstm_metrics.get("epochs_run", "?")
+            n_tr  = lstm_metrics.get("n_train", "?")
+            n_val = lstm_metrics.get("n_val", "?")
+            ts    = lstm_metrics.get("trained_at", "?")[:16].replace("T", " ")
+
+            st.metric("Acuracia (val)", f"{acc:.1%}", delta=f"{acc - 0.5:.1%} vs baseline")
+            st.metric("Val Loss",  f"{loss:.4f}")
+
+            st.markdown(
+                f"<div style='background:#1e1e1e;border-radius:8px;padding:10px 14px;"
+                f"border-left:4px solid #2196f3;font-size:0.88em'>"
+                f"<b>Treinado em:</b> {ts} UTC<br>"
+                f"<b>Melhor epoch:</b> {epoch} / {total}<br>"
+                f"<b>Amostras:</b> {n_tr} treino | {n_val} validacao<br>"
+                f"<b>Lookback:</b> {lstm_metrics.get('lookback', 60)} candles<br>"
+                f"<b>Features:</b> {', '.join(lstm_metrics.get('features', []))}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.warning("Modelo LSTM ainda nao treinado. Execute: `python -m core.lstm_trainer`")
+
+    # ── Accuracy history chart ────────────────────────────────────────────────
+    if lstm_metrics and lstm_metrics.get("accuracy_history"):
+        st.markdown("---")
+        st.subheader("Acuracia por Epoch (validacao)")
+
+        acc_hist  = lstm_metrics["accuracy_history"]
+        loss_hist = lstm_metrics.get("loss_history", [])
+        epochs_x  = list(range(1, len(acc_hist) + 1))
+
+        acc_fig = make_subplots(rows=1, cols=2,
+                                subplot_titles=["Val Accuracy", "Val Loss"])
+        acc_fig.add_trace(go.Scatter(x=epochs_x, y=acc_hist,
+            line=dict(color="#26a69a", width=2), name="Accuracy"), row=1, col=1)
+        acc_fig.add_hline(y=0.5, line_color="#ff9800", line_dash="dash",
+                          line_width=1, row=1, col=1,
+                          annotation_text="baseline 50%")
+
+        if loss_hist:
+            acc_fig.add_trace(go.Scatter(x=epochs_x, y=loss_hist,
+                line=dict(color="#ef5350", width=2), name="Loss"), row=1, col=2)
+
+        acc_fig.update_layout(template="plotly_dark", height=280,
+                              margin=dict(l=0, r=0, t=40, b=0),
+                              showlegend=False)
+        st.plotly_chart(acc_fig, use_container_width=True)
+
+    # ── Weight breakdown ──────────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("Composicao do Score (pesos v3)")
+
+    weights = {
+        "RSI":   config.SCORE_WEIGHT_RSI,
+        "MACD":  config.SCORE_WEIGHT_MACD,
+        "BB":    config.SCORE_WEIGHT_BB,
+        "ADX":   config.SCORE_WEIGHT_ADX,
+        "Stoch": config.SCORE_WEIGHT_STOCH,
+        "LSTM":  getattr(config, "SCORE_WEIGHT_LSTM", 21),
+    }
+    colors = ["#9c27b0", "#2196f3", "#00bcd4", "#ffd600", "#ff9800", "#26a69a"]
+
+    pie_fig = go.Figure(go.Pie(
+        labels=list(weights.keys()),
+        values=list(weights.values()),
+        marker_colors=colors,
+        hole=0.4,
+        textinfo="label+percent",
+    ))
+    pie_fig.update_layout(template="plotly_dark", height=300,
+                          margin=dict(l=0, r=0, t=20, b=0))
+    st.plotly_chart(pie_fig, use_container_width=True)
+
+    # ── Retrain button ────────────────────────────────────────────────────────
+    st.markdown("---")
+    if st.button("🔁 Retreinar modelo LSTM agora", use_container_width=True):
+        with st.spinner("Treinando LSTM... (pode levar 1-2 min)"):
+            try:
+                from core.lstm_trainer import train as lstm_train
+                m = lstm_train(force=True)
+                st.success(
+                    f"Treinamento concluido! Acuracia: {m.get('val_accuracy', 0):.1%} | "
+                    f"Loss: {m.get('val_loss', 0):.4f}"
+                )
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Erro no treinamento: {exc}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — Paper Trading
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_paper:
 

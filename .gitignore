@@ -15,3 +15,6 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+models/*.h5
+models/*.pkl
+models/lstm_metrics.json

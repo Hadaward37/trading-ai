@@ -85,10 +85,32 @@ def _score_series(
     stoch_buy_pts  = (config.STOCH_OVERSOLD  - stoch_k).clip(lower=0) / max(config.STOCH_OVERSOLD,       1) * config.SCORE_WEIGHT_STOCH
     stoch_sell_pts = (stoch_k - config.STOCH_OVERBOUGHT).clip(lower=0) / max(100 - config.STOCH_OVERBOUGHT, 1) * config.SCORE_WEIGHT_STOCH
 
-    buy_total  = (rsi_buy_pts  + macd_buy_pts  + bb_buy_pts  + adx_pts + stoch_buy_pts ).clip(0, 100)
-    sell_total = (rsi_sell_pts + macd_sell_pts + bb_sell_pts + adx_pts + stoch_sell_pts).clip(0, 100)
+    # ── LSTM (SCORE_WEIGHT_LSTM pts) ──────────────────────────────────────────
+    # lstm_prob is a scalar 0-100 for the LAST bar; broadcast to all rows.
+    # Returns neutral (50) when model not available — contributes 0 net bias.
+    lstm_prob = _get_lstm_prob(df)
+    lstm_buy_pts  = pd.Series(
+        max(lstm_prob - 50, 0) / 50 * config.SCORE_WEIGHT_LSTM, index=df.index
+    )
+    lstm_sell_pts = pd.Series(
+        max(50 - lstm_prob, 0) / 50 * config.SCORE_WEIGHT_LSTM, index=df.index
+    )
+
+    buy_total  = (rsi_buy_pts  + macd_buy_pts  + bb_buy_pts  + adx_pts + stoch_buy_pts  + lstm_buy_pts ).clip(0, 100)
+    sell_total = (rsi_sell_pts + macd_sell_pts + bb_sell_pts + adx_pts + stoch_sell_pts + lstm_sell_pts).clip(0, 100)
 
     return buy_total, sell_total
+
+
+def _get_lstm_prob(df: pd.DataFrame) -> float:
+    """Return LSTM directional probability (0-100). Returns 50 if disabled/unavailable."""
+    if not getattr(config, "LSTM_ENABLED", False):
+        return 50.0
+    try:
+        from core.lstm_model import predict as lstm_predict
+        return lstm_predict(df)
+    except Exception:
+        return 50.0
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -155,6 +177,10 @@ def generate_signals_custom(
 
     buy_votes, sell_votes = _vote_series(df, rsi_buy, rsi_sell)
     buy_score, sell_score = _score_series(df, rsi_buy, rsi_sell)
+
+    # LSTM probability column (scalar broadcast to all rows)
+    lstm_prob = _get_lstm_prob(df)
+    df["lstm_prob"] = round(lstm_prob, 1)
 
     df["signal"] = 0
     df.loc[buy_votes  >= 2, "signal"] =  1
