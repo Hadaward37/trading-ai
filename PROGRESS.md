@@ -219,6 +219,27 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 
 **Conclusão:** Fold1 falhou por forte viés direcional (EUR/USD em tendência de baixa). Sinais de reversão (RSI oversold + BB touch) foram penalizados pela tendência persistente. O filtro ADX<35 é uma medida paliativa — o root cause é o regime macro direcional.
 
+### Fractal Lab — Diagnóstico de Microestrutura (Sistema 2, 2026-05-07)
+
+Análise 5m vs 15m em janelas de 1h usando `research/fractal_lab/` (Sistema 1 não tocado).
+
+| Métrica | Fold1 (dez2024–fev2025) | Holdout (mar–mai2026) | Delta |
+|---------|------------------------|-----------------------|-------|
+| **disorder_score** | **34.9** | 25.2 | **+9.7 (+38%)** |
+| **coherence_score** | **36.4** | 43.3 | **−6.9 (−16%)** |
+| Janelas analisadas | 980–1045 | 912–1014 | — |
+
+**Hipótese confirmada:** A microestrutura do Fold1 era estruturalmente mais caótica.
+- O 5m invertia direção com 38% mais frequência que no Holdout
+- O 5m estava 16% menos alinhado com a tendência do 15m
+- Mercado caótico + EMA200 em downtrend = sinais de reversão sistematicamente penalizados
+
+**Implicação:** disorder_score alto não causou as perdas isoladamente, mas é um indicador antecipado de regime adverso para a estratégia do Sistema 1. Em mercados com disorder > ~30, a taxa de acerto de reversões cai.
+
+> Script: `.\venv\Scripts\python scripts\export_mt5_fractal.py`
+> Dados: `data/fractal_cache/EURUSD_5m_fold1.csv` (12.539 candles MT5) + yfinance holdout
+> Relatório: `data/fractal_report.json`
+
 ### Configuração congelada
 
 ```python
@@ -253,6 +274,7 @@ REGIME_ATR_RATIO_MAX  = 1.5
 - **Se PF rolling > 1.2 sem filtro** → Manter sistema atual, filtro optional
 - **Se PF rolling < 0.8** → Investigar regime shift antes de qualquer mudança
 - **Nunca retreinar** sem nova auditoria walk-forward completa
+- **Fractal Lab (novo):** Testar disorder_score como filtro adicional — bloquear sinais quando disorder_5m_vs_15m > 30 (limiar baseado na distribuição do Fold1: p50=35.0)
 
 ---
 
