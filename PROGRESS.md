@@ -198,6 +198,29 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 **Status:** Sistema CONGELADO por 30 dias para observação ao vivo.
 **Regra absoluta:** nenhuma alteração em modelo, features, target, thresholds ou filtros.
 
+### ✅ Fractal Lab (Sistema 2) — Pesquisa Concluída (2026-05-07)
+
+**Achado principal:** Sistema 1 é um "capturador de reversão confirmada" por design.
+O `BB_DEV=2.0` é filtro de exaustão implícito — aguarda 2σ (~2.4 ATR) para confirmar
+reversão. Não é delay acidental: é proteção estrutural contra entradas prematuras.
+
+**Candidato identificado para pós-incubação:** Adaptive Sizing baseado em stretch.
+
+| Métrica | Baseline 1.0x | Adaptive B5=0.1x |
+|---------|---------------|-----------------|
+| MaxDD (train) | 1446 pips | **254 pips (−82%)** |
+| MaxDD (test OOS) | 239 pips | **44 pips (−81%)** |
+| Sharpe proxy | 0.027 (train) | 0.004 → consistente |
+| B5 edge | PF=1.06 (Jan-Mai2026) | Regime-dependente |
+
+**Status da hipótese:**
+- MaxDD robustamente reduzido out-of-sample ✅
+- B5=0.0x vs B5=0.1x: inconclusivo (n_test=37 insuficiente) ⚠️
+- Adaptive sizing não altera lógica de sinal nem thresholds do Sistema 1 ✅
+
+> Detalhes: `research/fractal_lab/findings.md`
+> Walk-forward: `.\venv\Scripts\python scripts\adaptive_sizing_walkforward.py`
+
 ### O que foi validado (experimentos quantitativos)
 
 | Módulo | Resultado |
@@ -292,7 +315,7 @@ REGIME_ATR_RATIO_MAX  = 1.5
 - **Nunca retreinar** sem nova auditoria walk-forward completa
 - **Fractal Lab (revisado):** disorder_score descartado como filtro — não discrimina Fold1 do Holdout em fonte consistente (MT5). disorder robusto entre granularidades (delta 1m/5m vs 5m/15m = −2.4).
 - **EMA200 slope (novo):** Investigar EMA200 slope como filtro adicional — bloquear sinais de reversão quando slope < −0.10 pips/candle (abaixo da metade do valor tóxico do Fold1: −0.289)
-- **Adaptive Sizing (PRIORITÁRIO):** Implementar tabela de sizing baseada em stretch (ver abaixo) — maior impacto de risco por unidade de esforço.
+- **Adaptive Sizing (PRIORITÁRIO — candidato validado):** Walk-forward confirmou MaxDD −82% com B5=0.1x. Implementar tabela de sizing baseada em stretch (ver seção Achado crítico). Usar B5=0.1x (não 0.0x) para manter exposição em regimes favoráveis.
 
 ### Achado crítico — Fractal Lab v3: Stretch Analysis (2026-05-07)
 

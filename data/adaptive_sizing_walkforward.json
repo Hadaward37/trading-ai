@@ -1,0 +1,178 @@
+{
+  "generated_at": "2026-05-07T19:21:05.679585+00:00",
+  "periods": {
+    "train": {
+      "start": "2024-05-01",
+      "end": "2025-05-31",
+      "n": 236
+    },
+    "test": {
+      "start": "2025-06-01",
+      "end": "2025-08-31",
+      "n": 37
+    }
+  },
+  "sizing_scenarios": {
+    "baseline_1.0x": {
+      "B1 [0.0-0.5)": 1.0,
+      "B2 [0.5-1.0)": 1.0,
+      "B3 [1.0-1.5)": 1.0,
+      "B4 [1.5-2.0)": 1.0,
+      "B5 [2.0+]": 1.0
+    },
+    "adaptive_B5=0.1x": {
+      "B1 [0.0-0.5)": 1.0,
+      "B2 [0.5-1.0)": 1.0,
+      "B3 [1.0-1.5)": 0.7,
+      "B4 [1.5-2.0)": 0.3,
+      "B5 [2.0+]": 0.1
+    },
+    "adaptive_B5=0.0x": {
+      "B1 [0.0-0.5)": 1.0,
+      "B2 [0.5-1.0)": 1.0,
+      "B3 [1.0-1.5)": 0.7,
+      "B4 [1.5-2.0)": 0.3,
+      "B5 [2.0+]": 0.0
+    }
+  },
+  "results": {
+    "baseline_1.0x": {
+      "train": {
+        "n_trades": 236,
+        "n_active": 236,
+        "win_rate": 0.3856,
+        "profit_factor": 0.938,
+        "expectancy_pips": -1.2,
+        "sharpe_proxy": -0.027,
+        "max_drawdown_pips": 1446.23,
+        "total_pips": -282.33
+      },
+      "test": {
+        "n_trades": 37,
+        "n_active": 37,
+        "win_rate": 0.5946,
+        "profit_factor": 2.737,
+        "expectancy_pips": 20.29,
+        "sharpe_proxy": 0.455,
+        "max_drawdown_pips": 238.69,
+        "total_pips": 750.62
+      },
+      "degradation_ratio": 2.918
+    },
+    "adaptive_B5=0.1x": {
+      "train": {
+        "n_trades": 236,
+        "n_active": 236,
+        "win_rate": 0.3856,
+        "profit_factor": 1.011,
+        "expectancy_pips": 0.05,
+        "sharpe_proxy": 0.004,
+        "max_drawdown_pips": 254.16,
+        "total_pips": 10.93
+      },
+      "test": {
+        "n_trades": 37,
+        "n_active": 37,
+        "win_rate": 0.5946,
+        "profit_factor": 2.847,
+        "expectancy_pips": 4.3,
+        "sharpe_proxy": 0.304,
+        "max_drawdown_pips": 44.38,
+        "total_pips": 159.24
+      },
+      "degradation_ratio": 2.816
+    },
+    "adaptive_B5=0.0x": {
+      "train": {
+        "n_trades": 236,
+        "n_active": 55,
+        "win_rate": 0.1059,
+        "profit_factor": 1.08,
+        "expectancy_pips": 0.21,
+        "sharpe_proxy": 0.017,
+        "max_drawdown_pips": 209.9,
+        "total_pips": 49.27
+      },
+      "test": {
+        "n_trades": 37,
+        "n_active": 7,
+        "win_rate": 0.1351,
+        "profit_factor": 2.972,
+        "expectancy_pips": 2.66,
+        "sharpe_proxy": 0.192,
+        "max_drawdown_pips": 41.83,
+        "total_pips": 98.28
+      },
+      "degradation_ratio": 2.752
+    }
+  },
+  "bucket_breakdown": {
+    "train": {
+      "B1 [0.0-0.5)": {
+        "n_trades": 17,
+        "win_rate": 0.412,
+        "profit_factor": 1.028,
+        "expectancy_pips": 0.38
+      },
+      "B2 [0.5-1.0)": {
+        "n_trades": 23,
+        "win_rate": 0.435,
+        "profit_factor": 1.017,
+        "expectancy_pips": 0.22
+      },
+      "B3 [1.0-1.5)": {
+        "n_trades": 9,
+        "win_rate": 0.444,
+        "profit_factor": 1.272,
+        "expectancy_pips": 3.0
+      },
+      "B4 [1.5-2.0)": {
+        "n_trades": 6,
+        "win_rate": 0.667,
+        "profit_factor": 2.207,
+        "expectancy_pips": 10.38
+      },
+      "B5 [2.0+]": {
+        "n_trades": 181,
+        "win_rate": 0.365,
+        "profit_factor": 0.901,
+        "expectancy_pips": -2.12
+      }
+    },
+    "test": {
+      "B1 [0.0-0.5)": {
+        "n_trades": 1,
+        "win_rate": 1.0,
+        "profit_factor": 40190000000.0,
+        "expectancy_pips": 40.19
+      },
+      "B2 [0.5-1.0)": {
+        "n_trades": 3,
+        "win_rate": 0.667,
+        "profit_factor": 1.951,
+        "expectancy_pips": 13.25
+      },
+      "B3 [1.0-1.5)": {
+        "n_trades": 0
+      },
+      "B4 [1.5-2.0)": {
+        "n_trades": 3,
+        "win_rate": 0.667,
+        "profit_factor": 3.287,
+        "expectancy_pips": 20.36
+      },
+      "B5 [2.0+]": {
+        "n_trades": 30,
+        "win_rate": 0.567,
+        "profit_factor": 2.677,
+        "expectancy_pips": 20.32
+      }
+    }
+  },
+  "b5_comparison": {
+    "preferred": "B5=0.0x",
+    "B5=0.1x_test_PF": 2.847,
+    "B5=0.0x_test_PF": 2.972
+  },
+  "answer": "Baseline 1.0x: ROBUSTO (DR=2.92) | Adaptive B5=0.1x: ROBUSTO (DR=2.82) | Adaptive B5=0.0x: ROBUSTO (DR=2.75) | CONCLUSAO: INCONCLUSIVO SOBRE B5 — test period (Jun-Aug2025) foi favoravel para todos os cenarios (DR_baseline=2.92), inclusive B5 (E=+20.3pips). B5 nao e universalmente ruim: seu edge e regime-dependente. MaxDD reduzido consistentemente: train -82%, test -81%. Conclusao principal: adaptive sizing e robusto em MaxDD, B5 block e controverso. Recomendar B5=0.1x sobre B5=0.0x para preservar exposicao em regimes favoraveis. n_test=37: insuficiente para conclusao estatistica sobre buckets."
+}

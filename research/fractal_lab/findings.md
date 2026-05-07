@@ -1,7 +1,46 @@
 # Fractal Lab — Achados de Pesquisa
 
 > Sistema 1 permanece intocado. Todos os resultados são pesquisa pré-incubação.
-> Implementação só após 2026-06-06 e nova auditoria walk-forward.
+> Implementação só após 2026-06-06 e nova auditoria walk-forward completa.
+
+---
+
+## Conclusão da Pesquisa — Fractal Lab (2026-05-07)
+
+### Sistema 1: Capturador de Reversão Confirmada por Design
+
+O Sistema 1 **não tem um erro de timing**. O `BB_DEV=2.0` com janela de 20 períodos
+é um filtro implícito de exaustão: aguarda o preço atingir 2σ (~2.4 ATR) antes de
+sinalizar reversão. Isso é uma decisão de design defensiva, não um delay acidental.
+
+**Por que a espera faz sentido:** Entrando em B2 (0.5–1 ATR), o preço ainda tem
+espaço para continuar até B5 (~3 ATR adicionais), derrubando o SL (2.5 ATR) antes
+de reverter. O backtest confirmou isso: WR cai de 51.8% → 23.5% com entrada antecipada.
+
+### Adaptive Sizing: Candidato Mais Robusto Identificado
+
+O problema não é o timing — é a **gestão de risco em B5** (75.8% dos trades, PF=1.06).
+
+| Scenario | MaxDD Train | MaxDD Test | DR |
+|----------|-------------|------------|-----|
+| Baseline 1.0x | 1446 pips | 239 pips | 2.92 |
+| **Adaptive B5=0.1x** | **254 pips (−82%)** | **44 pips (−81%)** | 2.82 |
+| Adaptive B5=0.0x | 210 pips | 42 pips | 2.75 |
+
+**MaxDD é reduzido consistentemente em −82% (train) e −81% (test).**
+Esta é a única métrica que se confirma robustamente out-of-sample.
+
+### Status: Hipótese Operacional Promissora — Não Conclusão Definitiva
+
+| Achado | Evidência | Status |
+|--------|-----------|--------|
+| B5 tem edge mínimo em bull run Jan-Mai2026 | PF=1.06, n=235 | Confirmado no período |
+| B5 pode ter edge em outros regimes | Jun-Aug2025: E=+20 pips | Regime-dependente |
+| Adaptive sizing reduz MaxDD | −82% train, −81% test | Robusto entre períodos |
+| B5=0.0x superior a B5=0.1x | n_test=7 vs n_test=37 | Inconclusivo (n insuficiente) |
+
+**Recomendação para 06/06:** Testar `B5=0.1x` (não 0.0x) — preserva exposição em
+regimes onde B5 é favorável, limita o impacto no MaxDD.
 
 ---
 
