@@ -37,10 +37,13 @@ import sqlite3
 from research.fractal_lab.regime_classifier import (
     REGIME_STRESS, REGIME_COMPRESSED, REGIME_STRUCTURED, REGIMES,
     BIAS_BULL, BIAS_BEAR, BIAS_NEUTRAL,
+    STRETCH_BUCKETS, STRETCH_LOW_LABEL, STRETCH_HIGH_LABEL,
     compute_features, tag_regimes, resolve_outcomes,
     tag_trades_with_regime, tag_alignment,
     regime_stats, ks_test_regimes, separability_score,
     alignment_stats, ks_test_alignment,
+    tag_stretch, stretch_stats, stretch_regime_stats,
+    ks_test_stretch, answer_stretch_questions,
 )
 
 DB_PATH       = _ROOT / "data" / "trading.db"
@@ -242,6 +245,74 @@ def run(period: str = "all") -> dict:
         print()
     print(f"{'='*64}\n")
 
+    # ── v3: Distance-to-mean stretch analysis ─────────────────────────────────
+    print(f"{'='*64}")
+    print("  v3 — Distance-to-Mean Stretch Analysis")
+    print(f"{'='*64}")
+
+    df_tagged = tag_stretch(df_tagged, df_feat)
+
+    # Distribution of stretch at trade entries
+    bkt_dist = df_tagged["stretch_bucket"].value_counts().sort_index()
+    mr_pct   = df_tagged["mr_setup"].mean()
+    print(f"\n[stretch] Distribution at trade entries (|stretch| = |close-EMA50|/ATR14):")
+    for bkt, n in bkt_dist.items():
+        print(f"  {bkt:<20} {n:3d}  ({100*n/len(df_tagged):.1f}%)")
+    print(f"  mr_setup=True (BUY below / SELL above EMA50): "
+          f"{df_tagged['mr_setup'].sum()} ({100*mr_pct:.1f}%)")
+
+    # Per-bucket stats
+    print(f"\n[v3-stats] Per-bucket performance:")
+    bkt_stats = stretch_stats(df_tagged)
+    hdr = f"  {'Bucket':<20} {'N':>4}  {'WinRate':>8}  {'PF':>6}  {'E(pips)':>8}  {'Sharpe':>7}  {'MeanStr':>8}"
+    print(hdr)
+    print("  " + "-" * 72)
+    for label, row in bkt_stats.iterrows():
+        n   = int(row["n_trades"]) if not np.isnan(row["n_trades"]) else 0
+        wr  = f"{row['win_rate']:.1%}"         if not np.isnan(row["win_rate"])          else "   N/A"
+        pf  = f"{row['profit_factor']:.2f}"   if not np.isnan(row["profit_factor"])     else "  N/A"
+        e   = f"{row['expectancy_pips']:+.2f}" if not np.isnan(row["expectancy_pips"])   else "   N/A"
+        sh  = f"{row['sharpe_proxy']:.3f}"    if not np.isnan(row["sharpe_proxy"])      else "   N/A"
+        ms  = f"{row['mean_stretch']:.2f}"    if not np.isnan(row["mean_stretch"])      else "  N/A"
+        print(f"  {label:<20} {n:>4}  {wr:>8}  {pf:>6}  {e:>8}  {sh:>7}  {ms:>8}")
+
+    # Bucket × regime stats (STRESS and STRUCTURED)
+    print(f"\n[v3-regime] Bucket x Regime (STRESS / STRUCTURED):")
+    reg_bkt = stretch_regime_stats(df_tagged)
+    hdr2 = f"  {'Bucket':<20} {'Regime':<26} {'N':>4}  {'PF':>6}  {'E(pips)':>8}"
+    print(hdr2)
+    print("  " + "-" * 68)
+    for (bkt, reg), row in reg_bkt.iterrows():
+        if reg == REGIME_COMPRESSED:
+            continue
+        n  = int(row["n_trades"]) if not np.isnan(row["n_trades"]) else 0
+        pf = f"{row['profit_factor']:.2f}"   if not np.isnan(row["profit_factor"])   else "  N/A"
+        e  = f"{row['expectancy_pips']:+.2f}" if not np.isnan(row["expectancy_pips"]) else "   N/A"
+        print(f"  {bkt:<20} {reg:<26} {n:>4}  {pf:>6}  {e:>8}")
+
+    # KS-test: low vs high stretch
+    ks_str = ks_test_stretch(df_tagged)
+    print(f"\n[ks-v3]  {STRETCH_LOW_LABEL} vs {STRETCH_HIGH_LABEL}:")
+    ks_s = f"{ks_str['ks_stat']:.4f}" if not np.isnan(ks_str.get("ks_stat", np.nan)) else " N/A"
+    pv   = f"{ks_str['p_value']:.4f}" if not np.isnan(ks_str.get("p_value", np.nan)) else " N/A"
+    sig  = "* SIGNIFICANT (p<0.05)" if ks_str.get("significant") else "  n.s."
+    print(f"  KS={ks_s}  p={pv}  n=({ks_str.get('n_low',0)},{ks_str.get('n_high',0)})  {sig}")
+    if "e_low" in ks_str:
+        print(f"  E_low={ks_str['e_low']:+.2f}pips  E_high={ks_str['e_high']:+.2f}pips  "
+              f"delta={ks_str['e_high']-ks_str['e_low']:+.2f}")
+    if "note" in ks_str:
+        print(f"  Note: {ks_str['note']}")
+
+    # Answer the 4 questions
+    stretch_answers = answer_stretch_questions(df_tagged, bkt_stats)
+    print(f"\n{'='*64}")
+    print("PERGUNTAS v3 — Stretch Analysis:")
+    for q, a in stretch_answers.items():
+        print(f"  Q: {q}")
+        print(f"  A: {a}")
+        print()
+    print(f"{'='*64}\n")
+
     # 10. Save report
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -285,9 +356,15 @@ def run(period: str = "all") -> dict:
             "ks_stress_aligned_vs_not": ks_align,
             "answers": v2_answers,
         },
+        "v3_stretch": {
+            "bucket_stats": bkt_stats.reset_index().to_dict(orient="records"),
+            "ks_low_vs_high": ks_str,
+            "answers": stretch_answers,
+        },
         "tagged_trades_sample": df_tagged[
             ["datetime", "signal", "entry", "outcome", "pnl_pips",
-             "regime", "market_bias", "is_aligned"]
+             "regime", "market_bias", "is_aligned",
+             "signed_distance_to_mean", "stretch_bucket", "mr_setup"]
         ].head(20).to_dict(orient="records"),
     }
 

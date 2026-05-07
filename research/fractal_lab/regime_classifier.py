@@ -46,8 +46,35 @@ BIAS_BULL    =  1
 BIAS_BEAR    = -1
 BIAS_NEUTRAL =  0
 
+# ── Distance-to-mean (v3) constants ──────────────────────────────────────────
+
+EMA50_PERIOD = 50
+ATR14_PERIOD = 14
+
+# Stretch buckets by absolute signed_distance_to_mean (in ATR units)
+# Labels sort lexicographically in correct order
+STRETCH_BUCKETS = [
+    ("B1 [0.0-0.5)",  0.0, 0.5),
+    ("B2 [0.5-1.0)",  0.5, 1.0),
+    ("B3 [1.0-1.5)",  1.0, 1.5),
+    ("B4 [1.5-2.0)",  1.5, 2.0),
+    ("B5 [2.0+]",     2.0, np.inf),
+]
+STRETCH_LOW_LABEL  = "B1 [0.0-0.5)"   # low stretch  (KS reference)
+STRETCH_HIGH_LABEL = "B5 [2.0+]"      # high stretch (KS target)
+
 
 # ── Feature computation ───────────────────────────────────────────────────────
+
+def assign_stretch_bucket(stretch_abs: float) -> str:
+    """Map |signed_distance_to_mean| to a bucket label."""
+    if pd.isna(stretch_abs):
+        return STRETCH_BUCKETS[0][0]
+    for label, lo, hi in STRETCH_BUCKETS:
+        if lo <= stretch_abs < hi:
+            return label
+    return STRETCH_BUCKETS[-1][0]
+
 
 def _body_dir(series_open: pd.Series, series_close: pd.Series) -> pd.Series:
     diff = series_close - series_open
@@ -106,6 +133,22 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     # ADX: kept if provided, else left as NaN
     if "adx" not in df.columns:
         df["adx"] = np.nan
+
+    # EMA50 + ATR14 → signed distance to mean (causal)
+    ema50 = df["Close"].ewm(span=EMA50_PERIOD, adjust=False).mean()
+    df["ema50"] = ema50
+    tr14 = pd.concat([
+        df["High"] - df["Low"],
+        (df["High"] - df["Close"].shift(1)).abs(),
+        (df["Low"]  - df["Close"].shift(1)).abs(),
+    ], axis=1).max(axis=1)
+    atr14 = tr14.rolling(ATR14_PERIOD, min_periods=1).mean()
+    df["atr14"] = atr14
+    df["signed_distance_to_mean"] = (
+        (df["Close"] - ema50) / atr14.replace(0, np.nan)
+    ).clip(-10, 10)
+    df["stretch_abs"] = df["signed_distance_to_mean"].abs()
+    df["stretch_bucket"] = df["stretch_abs"].apply(assign_stretch_bucket)
 
     # EMA200 dual-slope market bias (causal: uses t-1 through t-21)
     ema200 = df["Close"].ewm(span=EMA200_PERIOD, adjust=False).mean()
@@ -533,3 +576,236 @@ def separability_score(ks_results: dict, stats_df: pd.DataFrame) -> dict:
         "sig_pairs":  round(sig_pairs, 4),
         "verdict":    verdict,
     }
+
+
+# ── v3: Distance-to-mean stretch analysis ─────────────────────────────────────
+
+def tag_stretch(df_trades: pd.DataFrame,
+                df_features: pd.DataFrame) -> pd.DataFrame:
+    """
+    Attach stretch features to each trade using values at entry time (no look-ahead).
+
+    Added columns:
+      signed_distance_to_mean — (close − EMA50) / ATR14 at entry bar
+      stretch_abs             — abs(signed_distance_to_mean)
+      stretch_bucket          — bucket label from STRETCH_BUCKETS
+      mr_setup                — True when trade enters in mean-reversion direction
+                                  BUY  with signed_dist < 0 (price below EMA50)
+                                  SELL with signed_dist > 0 (price above EMA50)
+    """
+    df_feat = df_features.copy()
+    if not isinstance(df_feat.index, pd.DatetimeIndex):
+        df_feat = df_feat.set_index("datetime")
+    df_feat.index = pd.to_datetime(df_feat.index).floor("h")
+
+    required = {"signed_distance_to_mean", "stretch_abs", "stretch_bucket"}
+    if not required.issubset(df_feat.columns):
+        raise ValueError(
+            "df_features must have signed_distance_to_mean, stretch_abs, stretch_bucket. "
+            "Call compute_features() first."
+        )
+
+    dists, abs_dists, buckets, mr_setups = [], [], [], []
+
+    for _, trade in df_trades.iterrows():
+        entry_dt = pd.to_datetime(trade["datetime"]).floor("h")
+        past = df_feat[df_feat.index <= entry_dt]
+
+        if past.empty:
+            sd, sa, bkt = 0.0, 0.0, STRETCH_BUCKETS[0][0]
+        else:
+            row = past.iloc[-1]
+            sd  = float(row["signed_distance_to_mean"])
+            sa  = float(row["stretch_abs"])
+            bkt = str(row["stretch_bucket"])
+
+        sig = int(trade["signal"])
+        mr  = bool((sig == 1 and sd < 0) or (sig == -1 and sd > 0))
+
+        dists.append(round(sd, 4))
+        abs_dists.append(round(sa, 4))
+        buckets.append(bkt)
+        mr_setups.append(mr)
+
+    df_out = df_trades.copy()
+    df_out["signed_distance_to_mean"] = dists
+    df_out["stretch_abs"]             = abs_dists
+    df_out["stretch_bucket"]          = buckets
+    df_out["mr_setup"]                = mr_setups
+    return df_out
+
+
+def stretch_stats(df_tagged: pd.DataFrame) -> pd.DataFrame:
+    """
+    Per-stretch-bucket statistics across all trades.
+
+    Returns DataFrame indexed by bucket label with columns:
+      n_trades, win_rate, profit_factor, expectancy_pips, sharpe_proxy, mean_stretch
+    """
+    records = []
+    for label, lo, hi in STRETCH_BUCKETS:
+        grp = df_tagged[df_tagged["stretch_bucket"] == label]
+        row = _grp_stats(grp, label)
+        row["mean_stretch"] = round(float(grp["stretch_abs"].mean()), 3) if len(grp) else np.nan
+        row["mr_setup_pct"] = round(float(grp["mr_setup"].mean()), 3)   if len(grp) else np.nan
+        records.append(row)
+    return pd.DataFrame(records).set_index("label")
+
+
+def stretch_regime_stats(df_tagged: pd.DataFrame) -> pd.DataFrame:
+    """
+    Bucket × regime statistics (STRESS and STRUCTURED only; COMPRESSED usually sparse).
+
+    Returns DataFrame with multi-index (stretch_bucket, regime).
+    """
+    records = []
+    for label, lo, hi in STRETCH_BUCKETS:
+        for regime in [REGIME_STRESS, REGIME_STRUCTURED, REGIME_COMPRESSED]:
+            grp = df_tagged[
+                (df_tagged["stretch_bucket"] == label) &
+                (df_tagged["regime"] == regime)
+            ]
+            row = _grp_stats(grp, label)
+            row["regime"] = regime
+            row["bucket"] = label
+            records.append(row)
+    df = pd.DataFrame(records)
+    df = df.set_index(["bucket", "regime"])
+    return df
+
+
+def ks_test_stretch(df_tagged: pd.DataFrame) -> dict:
+    """
+    KS-test: low stretch (B1 0–0.5 ATR) vs high stretch (B5 >2 ATR).
+
+    Null hypothesis: return distributions are the same.
+    Reject H0 (p < 0.05) → stretch level affects return distribution.
+    """
+    g_low  = df_tagged[df_tagged["stretch_bucket"] == STRETCH_LOW_LABEL ]["pnl_pips"].dropna()
+    g_high = df_tagged[df_tagged["stretch_bucket"] == STRETCH_HIGH_LABEL]["pnl_pips"].dropna()
+
+    result = {
+        "pair": f"{STRETCH_LOW_LABEL}_vs_{STRETCH_HIGH_LABEL}",
+        "n_low":  len(g_low),
+        "n_high": len(g_high),
+    }
+
+    if len(g_low) < 10 or len(g_high) < 10:
+        result.update({"ks_stat": np.nan, "p_value": np.nan,
+                        "significant": False,
+                        "note": "Insufficient samples (< 10 per group)"})
+        return result
+
+    ks, pv = stats.ks_2samp(g_low.values, g_high.values)
+    result.update({
+        "ks_stat":     round(float(ks), 4),
+        "p_value":     round(float(pv), 4),
+        "significant": bool(pv < 0.05),
+        "e_low":       round(float(g_low.mean()),  2),
+        "e_high":      round(float(g_high.mean()), 2),
+    })
+    return result
+
+
+def answer_stretch_questions(df_tagged: pd.DataFrame,
+                             bkt_stats: pd.DataFrame) -> dict:
+    """
+    Answer the 4 mandatory stretch analysis questions.
+
+    Q1: Does edge increase with stretch?
+    Q2: Is there an optimal exhaustion point?
+    Q3: Do extreme reversals (>2 ATR) improve or degrade PF?
+    Q4: Does profit come from mean reversion after excessive displacement?
+    """
+    answers = {}
+    valid = bkt_stats[bkt_stats["n_trades"] >= 5].copy()
+
+    # ── Q1: Edge trend across buckets ────────────────────────────────────────
+    if len(valid) >= 3:
+        e_vals  = valid["expectancy_pips"].values
+        buckets = list(valid.index)
+        # spearman correlation of bucket index vs E
+        rank = np.arange(len(e_vals))
+        corr, pval = stats.spearmanr(rank, e_vals)
+        direction = "AUMENTA" if corr > 0.3 else ("DIMINUI" if corr < -0.3 else "SEM TENDENCIA CLARA")
+        trend_detail = "  ".join(
+            f"{b}: E={e:+.1f}" for b, e in zip(buckets, e_vals)
+        )
+        answers["O edge do Sistema 1 aumenta conforme o stretch cresce?"] = (
+            f"{direction} (Spearman rho={corr:.3f}, p={pval:.3f}). "
+            f"Distribuicao: {trend_detail}"
+        )
+    else:
+        answers["O edge do Sistema 1 aumenta conforme o stretch cresce?"] = (
+            "INCONCLUSIVO: menos de 3 buckets com dados suficientes."
+        )
+
+    # ── Q2: Optimal exhaustion point ─────────────────────────────────────────
+    if len(valid) >= 2:
+        best_bucket = valid["expectancy_pips"].idxmax()
+        best_e      = float(valid.loc[best_bucket, "expectancy_pips"])
+        best_n      = int(valid.loc[best_bucket, "n_trades"])
+        best_pf     = float(valid.loc[best_bucket, "profit_factor"])
+        answers["Existe ponto de exaustao otimo?"] = (
+            f"Ponto otimo: {best_bucket}  E={best_e:+.2f}pips  PF={best_pf:.2f}  n={best_n}. "
+            f"{'Estatisticamente robusto (n>=20)' if best_n >= 20 else 'Poucos trades — interpretar com cautela'}."
+        )
+    else:
+        answers["Existe ponto de exaustao otimo?"] = "INCONCLUSIVO: dados insuficientes."
+
+    # ── Q3: Extreme reversals >2 ATR ─────────────────────────────────────────
+    b5_row = bkt_stats.loc[STRETCH_HIGH_LABEL] if STRETCH_HIGH_LABEL in bkt_stats.index else None
+    b1_row = bkt_stats.loc[STRETCH_LOW_LABEL]  if STRETCH_LOW_LABEL  in bkt_stats.index else None
+
+    if b5_row is not None and not np.isnan(b5_row["profit_factor"]):
+        pf5 = float(b5_row["profit_factor"])
+        e5  = float(b5_row["expectancy_pips"])
+        n5  = int(b5_row["n_trades"])
+        baseline_pf = float(b1_row["profit_factor"]) if b1_row is not None else np.nan
+        comparison  = (f"vs B1 PF={baseline_pf:.2f}" if not np.isnan(baseline_pf)
+                       else "sem baseline B1")
+        verdict = ("MELHORA" if pf5 > (baseline_pf or 1.0) else "DEGRADA") if not np.isnan(pf5) else "N/A"
+        answers["Reversoes extremas (>2 ATR) melhoram ou degradam o PF?"] = (
+            f"{verdict}: B5 PF={pf5:.2f}  E={e5:+.2f}pips  n={n5}  {comparison}. "
+            f"{'n insuficiente (< 10) — resultado pode ser ruido' if n5 < 10 else 'n suficiente'}."
+        )
+    else:
+        answers["Reversoes extremas (>2 ATR) melhoram ou degradam o PF?"] = (
+            f"INCONCLUSIVO: sem trades em {STRETCH_HIGH_LABEL}."
+        )
+
+    # ── Q4: Profit from mean reversion after excessive displacement ───────────
+    if "mr_setup" in df_tagged.columns:
+        mr_grp  = df_tagged[df_tagged["mr_setup"] == True]
+        cnt_grp = df_tagged[df_tagged["mr_setup"] == False]
+        mr_e   = float(mr_grp["pnl_pips"].mean())  if len(mr_grp)  > 0 else np.nan
+        cnt_e  = float(cnt_grp["pnl_pips"].mean()) if len(cnt_grp) > 0 else np.nan
+        mr_pf  = float(mr_grp[mr_grp["pnl_pips"]>0]["pnl_pips"].sum()  /
+                       max(abs(mr_grp[mr_grp["pnl_pips"]<=0]["pnl_pips"].sum()), 1e-9)) \
+                 if len(mr_grp) > 0 else np.nan
+
+        # high-stretch MR trades specifically
+        mr_high = df_tagged[
+            (df_tagged["mr_setup"] == True) &
+            (df_tagged["stretch_bucket"].isin([STRETCH_HIGH_LABEL, "B4 [1.5-2.0)"]))
+        ]
+        mr_high_e  = float(mr_high["pnl_pips"].mean()) if len(mr_high) > 0 else np.nan
+        mr_high_n  = len(mr_high)
+
+        if not np.isnan(mr_e) and not np.isnan(cnt_e):
+            verdict = "SIM" if mr_e > cnt_e else "NAO"
+            answers["O lucro vem de mean reversion apos deslocamentos excessivos?"] = (
+                f"{verdict}. MR-setup: E={mr_e:+.2f}pips (n={len(mr_grp)})  "
+                f"vs Counter: E={cnt_e:+.2f}pips (n={len(cnt_grp)}). "
+                f"MR-setup de alto stretch (B4+B5): E={mr_high_e:+.2f}pips (n={mr_high_n})."
+            )
+        else:
+            answers["O lucro vem de mean reversion apos deslocamentos excessivos?"] = (
+                "INCONCLUSIVO: dados insuficientes para comparacao MR vs counter."
+            )
+    else:
+        answers["O lucro vem de mean reversion apos deslocamentos excessivos?"] = (
+            "INCONCLUSIVO: coluna mr_setup ausente."
+        )
+
+    return answers
