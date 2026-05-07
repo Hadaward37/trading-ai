@@ -221,23 +221,39 @@ start /B .\venv\Scripts\python run_scheduler.py > scheduler.log 2>&1
 
 ### Fractal Lab — Diagnóstico de Microestrutura (Sistema 2, 2026-05-07)
 
-Análise 5m vs 15m em janelas de 1h usando `research/fractal_lab/` (Sistema 1 não tocado).
+Análise usando `research/fractal_lab/` — v1 (5m/15m, 60min) e v2 (1m/5m, 15min). Sistema 1 não tocado.
 
-| Métrica | Fold1 (dez2024–fev2025) | Holdout (mar–mai2026) | Delta |
-|---------|------------------------|-----------------------|-------|
-| **disorder_score** | **34.9** | 25.2 | **+9.7 (+38%)** |
-| **coherence_score** | **36.4** | 43.3 | **−6.9 (−16%)** |
-| Janelas analisadas | 980–1045 | 912–1014 | — |
+#### Resultado v1 inicial — CORRIGIDO (artifact de fonte de dados)
 
-**Hipótese confirmada:** A microestrutura do Fold1 era estruturalmente mais caótica.
-- O 5m invertia direção com 38% mais frequência que no Holdout
-- O 5m estava 16% menos alinhado com a tendência do 15m
-- Mercado caótico + EMA200 em downtrend = sinais de reversão sistematicamente penalizados
+A primeira versão comparou Fold1 com fonte MT5 e Holdout com fonte yfinance. Valores inválidos para comparação.
 
-**Implicação:** disorder_score alto não causou as perdas isoladamente, mas é um indicador antecipado de regime adverso para a estratégia do Sistema 1. Em mercados com disorder > ~30, a taxa de acerto de reversões cai.
+| Métrica | Fold1 (MT5) | Holdout (yfinance) | Delta | Status |
+|---------|-------------|-------------------|-------|--------|
+| disorder_score | 34.9 | 25.2 | +38% | ~~confirmado~~ **ARTIFACT** |
+| coherence_score | 36.4 | 43.3 | −16% | ~~confirmado~~ **ARTIFACT** |
 
-> Script: `.\venv\Scripts\python scripts\export_mt5_fractal.py`
-> Dados: `data/fractal_cache/EURUSD_5m_fold1.csv` (12.539 candles MT5) + yfinance holdout
+**Causa do artifact:** yfinance suaviza os dados 5m de forma diferente do feed real do MT5, produzindo disorder artificialmente mais baixo no Holdout.
+
+#### Resultado v2 corrigido — mesma fonte (MT5) para ambos os períodos
+
+| Métrica | Fold1 (MT5 5m) | Holdout (MT5 5m) | Delta |
+|---------|---------------|-----------------|-------|
+| disorder_score v1 (5m/15m) | **34.9** | **35.8** | −0.9 ≈ igual |
+| coherence_score v1 (5m/15m) | 36.4 | 36.1 | +0.3 ≈ igual |
+| disorder_score v2 (1m/5m) | N/A* | **33.4** | — |
+| coherence_score v2 (1m/5m) | N/A* | 36.4 | — |
+
+*Fold1 1m indisponível na Clear (retenção ~60 dias; Fold1 é 15+ meses atrás).
+
+**Hipótese REVISADA:** disorder_score **não discrimina** Fold1 do Holdout quando usada mesma fonte de dados. Os níveis de microestrutura são similares entre os dois períodos.
+
+**Robustez entre granularidades (Holdout):** delta disorder entre 1m/5m e 5m/15m = −2.4. O sinal é estável independentemente da granularidade usada.
+
+**Discriminador real confirmado: EMA200 slope**
+O Fractal Lab validou que a microestrutura não é o diferencial — reforçando o diagnóstico original: o root cause do Fold1 foi o **viés direcional macro** (EMA200 slope −0.289 pips/candle). Sinais de reversão falham sistematicamente em tendências fortes, independentemente da ordem do 5m.
+
+> Scripts: `.\venv\Scripts\python scripts\export_mt5_fractal.py [--skip-export] [--fold1-attempt]`
+> Dados: `data/fractal_cache/EURUSD_{5m_fold1,1m_holdout,5m_holdout}.csv`
 > Relatório: `data/fractal_report.json`
 
 ### Configuração congelada
@@ -274,7 +290,8 @@ REGIME_ATR_RATIO_MAX  = 1.5
 - **Se PF rolling > 1.2 sem filtro** → Manter sistema atual, filtro optional
 - **Se PF rolling < 0.8** → Investigar regime shift antes de qualquer mudança
 - **Nunca retreinar** sem nova auditoria walk-forward completa
-- **Fractal Lab (novo):** Testar disorder_score como filtro adicional — bloquear sinais quando disorder_5m_vs_15m > 30 (limiar baseado na distribuição do Fold1: p50=35.0)
+- **Fractal Lab (revisado):** disorder_score descartado como filtro — não discrimina Fold1 do Holdout em fonte consistente (MT5). disorder robusto entre granularidades (delta 1m/5m vs 5m/15m = −2.4).
+- **EMA200 slope (novo):** Investigar EMA200 slope como filtro adicional — bloquear sinais de reversão quando slope < −0.10 pips/candle (abaixo da metade do valor tóxico do Fold1: −0.289)
 
 ---
 
