@@ -5,15 +5,23 @@ WINDOW_MINUTES = 15
 
 
 def _body_direction(series_open: pd.Series, series_close: pd.Series) -> pd.Series:
-    """Open-to-close body direction. Works well for 5m+ candles."""
+    """Open-to-close body direction. Works well for 5m+ candles with real OHLC."""
     diff = series_close - series_open
     return diff.apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
 
 
 def _momentum_direction(series_close: pd.Series) -> pd.Series:
-    """Close-to-close momentum. Used for 1m where Open≈Close in yfinance EURUSD=X."""
+    """Close-to-close momentum. Fallback when Open≈Close (e.g. yfinance 1m EURUSD=X)."""
     diff = series_close.diff()
     return diff.apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
+
+
+def _auto_direction(df: pd.DataFrame) -> pd.Series:
+    """Pick body or momentum direction based on doji ratio."""
+    doji_ratio = ((df["Close"] - df["Open"]).abs() == 0).mean()
+    if doji_ratio > 0.5:
+        return _momentum_direction(df["Close"])
+    return _body_direction(df["Open"], df["Close"])
 
 
 def _ensure_utc(df: pd.DataFrame) -> pd.DataFrame:
@@ -25,61 +33,65 @@ def _ensure_utc(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def compute_coherence(df_1m: pd.DataFrame, df_5m: pd.DataFrame) -> dict:
+def compute_coherence(
+    df_micro: pd.DataFrame,
+    df_macro: pd.DataFrame,
+    window_minutes: int = WINDOW_MINUTES,
+) -> dict:
     """
-    Coherence score (0–100): how aligned 1m candles are with the 5m direction.
+    Coherence score (0-100): how aligned micro candles are with the macro direction.
 
-    Per 15-minute window:
-      - dominant_5m_dir: body-weighted vote of 5m candles in window
-      - alignment: % of non-doji 1m candles (close-to-close) agreeing with dominant_5m_dir
-      - consistency: 1 - normalized std of 1m momentum directions
+    Per window:
+      - dominant_macro_dir: body-weighted vote of macro candles in window
+      - alignment: % of non-doji micro candles agreeing with dominant direction
+      - consistency: 1 - normalized std of micro directions
       - window_score = 0.6 * alignment + 0.4 * consistency
 
     Final score = mean(window_scores) * 100
 
-    Note: 1m direction uses close-to-close momentum because yfinance EURUSD=X
-    1m data returns Open≈Close for most candles.
+    Supports any pair of timeframes (1m/5m, 5m/15m, etc.).
+    Direction method is auto-selected per dataframe based on doji ratio.
     """
-    if df_1m.empty or df_5m.empty:
+    if df_micro.empty or df_macro.empty:
         return {"coherence_score": None, "n_windows": 0, "window_scores": [], "available": False}
 
-    df_1m = _ensure_utc(df_1m)
-    df_5m = _ensure_utc(df_5m)
+    df_micro = _ensure_utc(df_micro)
+    df_macro = _ensure_utc(df_macro)
 
-    df_1m["_dir"] = _momentum_direction(df_1m["Close"])
-    df_5m["_dir"] = _body_direction(df_5m["Open"], df_5m["Close"])
-    df_5m["_body"] = (df_5m["Close"] - df_5m["Open"]).abs()
+    df_micro["_dir"] = _auto_direction(df_micro)
+    df_macro["_dir"] = _body_direction(df_macro["Open"], df_macro["Close"])
+    df_macro["_body"] = (df_macro["Close"] - df_macro["Open"]).abs()
 
-    t_start = max(df_1m.index.min(), df_5m.index.min()).floor(f"{WINDOW_MINUTES}min")
-    t_end = min(df_1m.index.max(), df_5m.index.max()).ceil(f"{WINDOW_MINUTES}min")
+    min_micro = max(3, window_minutes // 20)
 
-    windows = pd.date_range(start=t_start, end=t_end, freq=f"{WINDOW_MINUTES}min", tz="UTC")
+    t_start = max(df_micro.index.min(), df_macro.index.min()).floor(f"{window_minutes}min")
+    t_end = min(df_micro.index.max(), df_macro.index.max()).ceil(f"{window_minutes}min")
+
+    windows = pd.date_range(start=t_start, end=t_end, freq=f"{window_minutes}min", tz="UTC")
     window_scores = []
 
     for w in windows[:-1]:
-        w_end = w + pd.Timedelta(minutes=WINDOW_MINUTES)
-        m1 = df_1m[(df_1m.index >= w) & (df_1m.index < w_end)]
-        m5 = df_5m[(df_5m.index >= w) & (df_5m.index < w_end)]
+        w_end = w + pd.Timedelta(minutes=window_minutes)
+        micro = df_micro[(df_micro.index >= w) & (df_micro.index < w_end)]
+        macro = df_macro[(df_macro.index >= w) & (df_macro.index < w_end)]
 
-        if len(m1) < 5 or len(m5) < 1:
+        if len(micro) < min_micro or len(macro) < 1:
             continue
 
-        total_body = m5["_body"].sum()
+        total_body = macro["_body"].sum()
         if total_body == 0:
             continue
-        weighted_dir = (m5["_dir"] * m5["_body"]).sum() / total_body
+        weighted_dir = (macro["_dir"] * macro["_body"]).sum() / total_body
         dominant_dir = 1 if weighted_dir > 0.05 else (-1 if weighted_dir < -0.05 else 0)
         if dominant_dir == 0:
             continue
 
-        non_doji = m1[m1["_dir"] != 0]
+        non_doji = micro[micro["_dir"] != 0]
         if len(non_doji) == 0:
             continue
 
         alignment = (non_doji["_dir"] == dominant_dir).mean()
-
-        # std of {-1, 0, 1} series; max theoretical std ≈ 1 for alternating ±1
-        dir_std = m1["_dir"].std()
+        dir_std = micro["_dir"].std()
         consistency = max(0.0, 1.0 - dir_std)
 
         window_scores.append(0.6 * alignment + 0.4 * consistency)

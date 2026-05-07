@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-07T15:10:50.799333+00:00",
+  "generated_at": "2026-05-07T16:32:00.519423+00:00",
   "symbol": "EURUSD=X",
   "note": "yfinance limits: 1m ≤ 7 days back, 5m ≤ 60 days back. Fold1 (Sep2024–Feb2025) outside these limits — returns empty. Holdout: 5m covers last ~60d, 1m last ~7d.",
   "periods": {
