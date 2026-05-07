@@ -1,0 +1,262 @@
+{
+  "generated_at": "2026-05-07T17:45:47.480610+00:00",
+  "period": "all",
+  "regime_definitions": {
+    "REGIME_1_STRESS": {
+      "atr_ratio": "> 1.5",
+      "adx": "> 35.0",
+      "disorder_proxy": "> 0.55",
+      "priority": 1
+    },
+    "REGIME_2_COMPRESSED": {
+      "atr_ratio": "< 0.8",
+      "adx": "< 18.0",
+      "coherence_proxy": "< 0.42",
+      "priority": 2
+    },
+    "REGIME_3_STRUCTURED": {
+      "description": "default (not STRESS or COMPRESSED)",
+      "priority": 3
+    }
+  },
+  "distribution": {
+    "REGIME_1_STRESS": 4663,
+    "REGIME_2_COMPRESSED": 886,
+    "REGIME_3_STRUCTURED": 6772
+  },
+  "outcome_summary": {
+    "tp_hit": 124,
+    "sl_hit": 145,
+    "timeout": 41,
+    "overall_win_rate": 0.4,
+    "mean_pnl_pips": 6.93
+  },
+  "regime_stats": [
+    {
+      "regime": "REGIME_1_STRESS",
+      "n_trades": 154,
+      "win_rate": 0.5649,
+      "profit_factor": 1.906,
+      "expectancy_pips": 13.89,
+      "sharpe_proxy": 0.295,
+      "max_drawdown_pips": 529.11
+    },
+    {
+      "regime": "REGIME_2_COMPRESSED",
+      "n_trades": 4,
+      "win_rate": 0.75,
+      "profit_factor": 6.271,
+      "expectancy_pips": 27.28,
+      "sharpe_proxy": 0.85,
+      "max_drawdown_pips": 0.0
+    },
+    {
+      "regime": "REGIME_3_STRUCTURED",
+      "n_trades": 152,
+      "win_rate": 0.4211,
+      "profit_factor": 0.966,
+      "expectancy_pips": -0.66,
+      "sharpe_proxy": -0.016,
+      "max_drawdown_pips": 1436.03
+    }
+  ],
+  "ks_results": {
+    "REGIME_1_STRESS_vs_REGIME_2_COMPRESSED": {
+      "ks_stat": NaN,
+      "p_value": NaN,
+      "significant": false,
+      "n": [
+        154,
+        4
+      ]
+    },
+    "REGIME_1_STRESS_vs_REGIME_3_STRUCTURED": {
+      "ks_stat": 0.1769,
+      "p_value": 0.0138,
+      "significant": true,
+      "n": [
+        154,
+        152
+      ]
+    },
+    "REGIME_2_COMPRESSED_vs_REGIME_3_STRUCTURED": {
+      "ks_stat": NaN,
+      "p_value": NaN,
+      "significant": false,
+      "n": [
+        4,
+        152
+      ]
+    }
+  },
+  "separability": {
+    "REGIME_SEPARABILITY_SCORE": 0.8598,
+    "ks_score": 0.9862,
+    "e_score": 1.0,
+    "sig_pairs": 0.3333,
+    "verdict": "SEPARABLE — regimes são estatisticamente distintos"
+  },
+  "answer": "SIM — Score=0.86. Regimes separaveis (KS p<0.05). Melhor: REGIME_1_STRESS E=+13.89pips  |  Pior: REGIME_3_STRUCTURED E=-0.66pips. Filtrar 'REGIME_3_STRUCTURED' aumentaria expectativa. ATENCAO: resultado e period-specific (bullish Jan-Mai2026); validar em Fold1 antes de implementar.",
+  "tagged_trades_sample": [
+    {
+      "datetime": "2026-01-09 08:00:00",
+      "signal": 1,
+      "entry": 1.16488,
+      "outcome": "SL_HIT",
+      "pnl_pips": -20.7,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-09 11:00:00",
+      "signal": 1,
+      "entry": 1.16422,
+      "outcome": "TP_HIT",
+      "pnl_pips": 34.7,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-09 14:00:00",
+      "signal": 1,
+      "entry": 1.16412,
+      "outcome": "TP_HIT",
+      "pnl_pips": 33.5,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-09 16:00:00",
+      "signal": 1,
+      "entry": 1.16364,
+      "outcome": "TP_HIT",
+      "pnl_pips": 44.8,
+      "regime": "REGIME_1_STRESS"
+    },
+    {
+      "datetime": "2026-01-09 18:00:00",
+      "signal": 1,
+      "entry": 1.16332,
+      "outcome": "TP_HIT",
+      "pnl_pips": 49.0,
+      "regime": "REGIME_1_STRESS"
+    },
+    {
+      "datetime": "2026-01-09 19:00:00",
+      "signal": 1,
+      "entry": 1.16315,
+      "outcome": "TP_HIT",
+      "pnl_pips": 47.4,
+      "regime": "REGIME_1_STRESS"
+    },
+    {
+      "datetime": "2026-01-09 20:00:00",
+      "signal": 1,
+      "entry": 1.16338,
+      "outcome": "TP_HIT",
+      "pnl_pips": 46.6,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-09 23:00:00",
+      "signal": 1,
+      "entry": 1.16367,
+      "outcome": "TP_HIT",
+      "pnl_pips": 42.0,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-12 00:00:00",
+      "signal": 1,
+      "entry": 1.16313,
+      "outcome": "TP_HIT",
+      "pnl_pips": 42.3,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-12 01:00:00",
+      "signal": 1,
+      "entry": 1.16236,
+      "outcome": "TP_HIT",
+      "pnl_pips": 42.7,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-13 13:00:00",
+      "signal": 1,
+      "entry": 1.16684,
+      "outcome": "SL_HIT",
+      "pnl_pips": -22.4,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-13 14:00:00",
+      "signal": -1,
+      "entry": 1.1655,
+      "outcome": "TP_HIT",
+      "pnl_pips": 38.0,
+      "regime": "REGIME_1_STRESS"
+    },
+    {
+      "datetime": "2026-01-14 08:00:00",
+      "signal": 1,
+      "entry": 1.16489,
+      "outcome": "SL_HIT",
+      "pnl_pips": -20.7,
+      "regime": "REGIME_2_COMPRESSED"
+    },
+    {
+      "datetime": "2026-01-14 20:00:00",
+      "signal": -1,
+      "entry": 1.16378,
+      "outcome": "TP_HIT",
+      "pnl_pips": 39.1,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 15:00:00",
+      "signal": 1,
+      "entry": 1.16012,
+      "outcome": "TP_HIT",
+      "pnl_pips": 37.9,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 16:00:00",
+      "signal": 1,
+      "entry": 1.1601,
+      "outcome": "TP_HIT",
+      "pnl_pips": 40.3,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 17:00:00",
+      "signal": 1,
+      "entry": 1.16022,
+      "outcome": "TP_HIT",
+      "pnl_pips": 41.0,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 18:00:00",
+      "signal": 1,
+      "entry": 1.16044,
+      "outcome": "TP_HIT",
+      "pnl_pips": 41.7,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 19:00:00",
+      "signal": 1,
+      "entry": 1.16089,
+      "outcome": "TP_HIT",
+      "pnl_pips": 41.7,
+      "regime": "REGIME_3_STRUCTURED"
+    },
+    {
+      "datetime": "2026-01-15 22:00:00",
+      "signal": 1,
+      "entry": 1.16042,
+      "outcome": "TP_HIT",
+      "pnl_pips": 40.2,
+      "regime": "REGIME_1_STRESS"
+    }
+  ]
+}
