@@ -1,16 +1,23 @@
 """
-Fractal Lab - 5m vs 15m comparison: Fold1 vs Holdout.
+Fractal Lab v2 - 1m real data via MT5 Clear.
 
-Uses the 5m data already exported from MT5 (data/fractal_cache/EURUSD_5m_fold1.csv).
-Computes coherence and disorder using 5m (micro) vs 15m resampled (macro) within 1h windows.
-Compares Fold1 (dez2024-fev2025) against Holdout (mar-mai2026).
-Updates data/fractal_report.json with results and answers the key question.
+Broker retention window: ~60 days for 1m. Fold1 (set2024-fev2025) is beyond
+that limit, so only the Holdout period can be analyzed at 1m resolution.
+
+What this script does:
+  1. Exports Holdout 1m + 5m from MT5 Clear  (Mar-May 2026, ~60 days)
+  2. Runs v2 metrics: 1m vs 5m, 15min windows  (original plan)
+  3. Compares v2 Holdout against v1 Holdout (5m vs 15m) to answer:
+     "does more granular data show more disorder?"
+  4. Loads Fold1 v1 (5m vs 15m) from report for the full picture
+  5. Updates data/fractal_report.json
+
+For --fold1-attempt: tries to export Fold1 1m anyway - documents what MT5 returns.
 
 Usage:
-    .\\venv\\Scripts\\python scripts\\export_mt5_fractal.py
-
-No MT5 connection required - uses existing CSV.
-To re-export from MT5: delete EURUSD_5m_fold1.csv and run with --export flag.
+    .\\venv\\Scripts\\python scripts\\export_mt5_fractal.py          # normal run
+    .\\venv\\Scripts\\python scripts\\export_mt5_fractal.py --skip-export  # reuse CSVs
+    .\\venv\\Scripts\\python scripts\\export_mt5_fractal.py --fold1-attempt
 """
 
 from __future__ import annotations
@@ -18,7 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -29,244 +36,352 @@ sys.path.insert(0, str(_ROOT))
 
 import pandas as pd
 
-SYMBOL      = "EURUSD"
-CACHE_DIR   = _ROOT / "data" / "fractal_cache"
-CSV_5M_FOLD1 = CACHE_DIR / "EURUSD_5m_fold1.csv"
-REPORT_PATH  = _ROOT / "data" / "fractal_report.json"
+SYMBOL     = "EURUSD"
+CACHE_DIR  = _ROOT / "data" / "fractal_cache"
+REPORT_PATH = _ROOT / "data" / "fractal_report.json"
 
-WINDOW_MINUTES = 60   # 1h windows: 12 micro (5m) candles + 4 macro (15m) candles per window
+# CSVs
+CSV_5M_FOLD1      = CACHE_DIR / "EURUSD_5m_fold1.csv"
+CSV_1M_HOLDOUT    = CACHE_DIR / "EURUSD_1m_holdout.csv"
+CSV_5M_HOLDOUT    = CACHE_DIR / "EURUSD_5m_holdout.csv"
+CSV_1M_FOLD1      = CACHE_DIR / "EURUSD_1m_fold1.csv"  # attempted, likely empty
 
+# MT5 limits: 1m data available for ~60 days
+MT5_1M_LIMIT_DAYS = 60
+MT5_1M_CHUNK_DAYS = 30   # request in chunks to stay well under the ~65k candle limit
 
-# ── Data loaders ──────────────────────────────────────────────────────────────
-
-def load_fold1_5m() -> pd.DataFrame:
-    """Load Fold1 5m data from the MT5 CSV export."""
-    if not CSV_5M_FOLD1.exists():
-        print(f"[ERROR] {CSV_5M_FOLD1} not found.")
-        print("        Run with --export flag and MT5 open to download it first.")
-        sys.exit(1)
-
-    df = pd.read_csv(CSV_5M_FOLD1, index_col="Datetime", parse_dates=True)
-    df.index = pd.to_datetime(df.index, utc=True)
-    df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-    df = df.dropna(subset=["Open", "Close"]).sort_index()
-    print(f"[fold1]   5m loaded: {len(df):,} candles  ({df.index[0].date()} -> {df.index[-1].date()})")
-    return df
+FOLD1_START  = datetime(2024, 9,  1,  0,  0, tzinfo=timezone.utc)
+FOLD1_END    = datetime(2025, 2, 28, 23, 59, tzinfo=timezone.utc)
 
 
-def load_holdout_5m() -> pd.DataFrame:
-    """Load Holdout 5m data from the yfinance parquet cache."""
-    from research.fractal_lab.data_loader import get_period_data
-    _, df = get_period_data("holdout")
-    df = df[["Open", "High", "Low", "Close", "Volume"]].copy()
-    df = df.dropna(subset=["Open", "Close"]).sort_index()
-    print(f"[holdout] 5m loaded: {len(df):,} candles  ({df.index[0].date()} -> {df.index[-1].date()})")
-    return df
+# ── MT5 export helpers ────────────────────────────────────────────────────────
 
-
-def resample_to_15m(df_5m: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate 5m candles into 15m candles."""
-    df15 = df_5m.resample("15min").agg({
-        "Open":   "first",
-        "High":   "max",
-        "Low":    "min",
-        "Close":  "last",
-        "Volume": "sum",
-    }).dropna(subset=["Open", "Close"])
-    return df15
-
-
-# ── MT5 export (optional, for re-downloading Fold1) ───────────────────────────
-
-def export_from_mt5() -> None:
-    """Download EURUSD 5m for Fold1 period from MT5 and save to CSV."""
-    from datetime import datetime as dt
-
+def _connect_mt5():
     try:
         import MetaTrader5 as mt5
     except ImportError:
         print("[ERROR] MetaTrader5 not installed: pip install MetaTrader5")
         sys.exit(1)
-
     import config
-    fold1_start = dt(2024, 9, 1,  0, 0, tzinfo=timezone.utc)
-    fold1_end   = dt(2025, 2, 28, 23, 59, tzinfo=timezone.utc)
-
     timeout = getattr(config, "MT5_TIMEOUT_MS", 60_000)
     if not mt5.initialize(timeout=timeout):
-        print(f"[ERROR] MT5 initialize failed: {mt5.last_error()}")
+        print(f"[ERROR] MT5 init failed: {mt5.last_error()}")
+        print("        Make sure MT5 is open and logged in.")
         sys.exit(1)
+    info = mt5.terminal_info()
+    print(f"[MT5] Connected  build={info.build}")
+    return mt5
 
-    print(f"[MT5] Fetching {SYMBOL} 5m  {fold1_start.date()} -> {fold1_end.date()} ...")
-    rates = mt5.copy_rates_range(SYMBOL, mt5.TIMEFRAME_M5, fold1_start, fold1_end)
-    mt5.shutdown()
 
-    if rates is None or len(rates) == 0:
-        print("[ERROR] MT5 returned no data.")
-        sys.exit(1)
+def _fetch_chunked(mt5, symbol: str, timeframe, tf_label: str,
+                   date_from: datetime, date_to: datetime,
+                   chunk_days: int = MT5_1M_CHUNK_DAYS) -> pd.DataFrame:
+    """Fetch in daily/weekly chunks to avoid MT5 candle-count limits."""
+    parts = []
+    cursor = date_from
+    while cursor < date_to:
+        end = min(cursor + timedelta(days=chunk_days), date_to)
+        r = mt5.copy_rates_range(symbol, timeframe, cursor, end)
+        if r is not None and len(r) > 1:
+            parts.append(pd.DataFrame(r))
+        cursor = end
 
-    df = pd.DataFrame(rates)
+    if not parts:
+        return pd.DataFrame()
+
+    df = pd.concat(parts, ignore_index=True)
+    df = df.drop_duplicates(subset=["time"])
     df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
     df = df.rename(columns={"time": "Datetime", "open": "Open", "high": "High",
                              "low": "Low", "close": "Close", "tick_volume": "Volume"})
-    df = df.set_index("Datetime")[["Open", "High", "Low", "Close", "Volume"]].sort_index()
+    df = df.set_index("Datetime")[["Open", "High", "Low", "Close", "Volume"]]
+    df = df.sort_index()
 
+    print(f"[MT5] {tf_label}: {len(df):,} candles  "
+          f"({df.index[0].date()} -> {df.index[-1].date()})")
+    return df
+
+
+def export_holdout(skip_if_exists: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Export Holdout 1m + 5m from MT5. Returns (df_1m, df_5m)."""
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    df.to_csv(CSV_5M_FOLD1)
-    print(f"[MT5] Saved {CSV_5M_FOLD1.name} ({len(df):,} rows)")
+
+    if skip_if_exists and CSV_1M_HOLDOUT.exists() and CSV_5M_HOLDOUT.exists():
+        print("[export] Holdout CSVs found - loading from cache.")
+        df1 = _load_csv(CSV_1M_HOLDOUT)
+        df5 = _load_csv(CSV_5M_HOLDOUT)
+        return df1, df5
+
+    today    = datetime.now(timezone.utc).replace(hour=23, minute=59, second=0)
+    date_from = today - timedelta(days=MT5_1M_LIMIT_DAYS)
+
+    mt5 = _connect_mt5()
+    try:
+        print(f"\n[export] Holdout 1m  ({date_from.date()} -> {today.date()}) ...")
+        df_1m = _fetch_chunked(mt5, SYMBOL, mt5.TIMEFRAME_M1, "1m",
+                               date_from, today, chunk_days=MT5_1M_CHUNK_DAYS)
+
+        print(f"\n[export] Holdout 5m  ({date_from.date()} -> {today.date()}) ...")
+        df_5m = _fetch_chunked(mt5, SYMBOL, mt5.TIMEFRAME_M5, "5m",
+                               date_from, today, chunk_days=MT5_1M_CHUNK_DAYS)
+    finally:
+        mt5.shutdown()
+        print("[MT5] Connection closed.")
+
+    if not df_1m.empty:
+        df_1m.to_csv(CSV_1M_HOLDOUT)
+        print(f"[export] Saved {CSV_1M_HOLDOUT.name}")
+    if not df_5m.empty:
+        df_5m.to_csv(CSV_5M_HOLDOUT)
+        print(f"[export] Saved {CSV_5M_HOLDOUT.name}")
+
+    return df_1m, df_5m
 
 
-# ── Metrics ───────────────────────────────────────────────────────────────────
+def attempt_fold1_1m() -> pd.DataFrame:
+    """Try to export Fold1 1m from MT5. Documents what the broker actually returns."""
+    print(f"\n[fold1-attempt] Requesting 1m  {FOLD1_START.date()} -> {FOLD1_END.date()} ...")
+    mt5 = _connect_mt5()
+    try:
+        # single request - expect empty or sentinel
+        r = mt5.copy_rates_range(SYMBOL, mt5.TIMEFRAME_M1, FOLD1_START, FOLD1_END)
+        if r is None or len(r) == 0:
+            print(f"[fold1-attempt] Broker returned nothing: {mt5.last_error()}")
+            return pd.DataFrame()
 
-def run_metrics(df_5m: pd.DataFrame, label: str) -> dict:
+        df = pd.DataFrame(r)
+        df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
+        in_range = df[(df["time"] >= FOLD1_START) & (df["time"] <= FOLD1_END)]
+        sentinel  = df[~((df["time"] >= FOLD1_START) & (df["time"] <= FOLD1_END))]
+        print(f"[fold1-attempt] Rows returned: {len(df):,}")
+        print(f"[fold1-attempt]   In Fold1 range: {len(in_range):,}")
+        print(f"[fold1-attempt]   Sentinel/OOB:   {len(sentinel):,}")
+        if not df.empty:
+            print(f"[fold1-attempt]   Actual dates: {df.time.min().date()} -> {df.time.max().date()}")
+
+        if len(in_range) > 100:
+            df_out = in_range.rename(columns={"time": "Datetime", "open": "Open", "high": "High",
+                                               "low": "Low", "close": "Close", "tick_volume": "Volume"})
+            df_out = df_out.set_index("Datetime")[["Open", "High", "Low", "Close", "Volume"]]
+            df_out.to_csv(CSV_1M_FOLD1)
+            print(f"[fold1-attempt] Saved {len(df_out):,} real candles to {CSV_1M_FOLD1.name}")
+            return df_out
+
+        print("[fold1-attempt] RESULT: Fold1 1m unavailable at Clear broker.")
+        print("                Retention limit: ~60 days. Fold1 is 15+ months ago.")
+        return pd.DataFrame()
+    finally:
+        mt5.shutdown()
+
+
+# ── CSV loader ────────────────────────────────────────────────────────────────
+
+def _load_csv(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path, index_col="Datetime", parse_dates=True)
+    df.index = pd.to_datetime(df.index, utc=True)
+    df = df[["Open", "High", "Low", "Close", "Volume"]].dropna(subset=["Open", "Close"])
+    return df.sort_index()
+
+
+# ── Fractal metrics ───────────────────────────────────────────────────────────
+
+def run_metrics(df_micro: pd.DataFrame, df_macro: pd.DataFrame,
+                label: str, window_minutes: int) -> dict:
     from research.fractal_lab.coherence import compute_coherence
     from research.fractal_lab.disorder import compute_disorder
 
-    df_15m = resample_to_15m(df_5m)
-    print(f"  15m candles derived: {len(df_15m):,}")
+    if df_micro.empty:
+        print(f"  [SKIP] {label}: micro data empty")
+        return {"coherence": {"available": False}, "disorder": {"available": False}}
 
-    coherence = compute_coherence(df_5m, df_15m, window_minutes=WINDOW_MINUTES)
-    disorder  = compute_disorder(df_5m, df_15m, window_minutes=WINDOW_MINUTES)
+    coh = compute_coherence(df_micro, df_macro, window_minutes=window_minutes)
+    dis = compute_disorder(df_micro, df_macro, window_minutes=window_minutes)
 
-    if coherence["available"]:
-        print(f"  coherence_score : {coherence['coherence_score']:.1f}  (n_windows={coherence['n_windows']})")
-    else:
-        print("  coherence_score : N/A")
-
-    if disorder["available"]:
-        print(f"  disorder_score  : {disorder['disorder_score']:.1f}  (n_windows={disorder['n_windows']})")
-    else:
-        print("  disorder_score  : N/A")
+    coh_str = f"{coh['coherence_score']:.1f} (n={coh['n_windows']})" if coh["available"] else "N/A"
+    dis_str = f"{dis['disorder_score']:.1f} (n={dis['n_windows']})" if dis["available"] else "N/A"
+    print(f"  coherence : {coh_str}")
+    print(f"  disorder  : {dis_str}")
 
     return {
-        "coherence": {k: v for k, v in coherence.items() if k != "window_scores"},
-        "disorder":  {k: v for k, v in disorder.items()  if k != "window_scores"},
+        "coherence": {k: v for k, v in coh.items() if k != "window_scores"},
+        "disorder":  {k: v for k, v in dis.items()  if k != "window_scores"},
     }
 
 
-# ── Answer + report ───────────────────────────────────────────────────────────
+# ── Comparison table ──────────────────────────────────────────────────────────
 
-def build_answer(f1_dis, f1_coh, ho_dis, ho_coh) -> str:
-    if f1_dis is None:
-        return "INCONCLUSIVO: Fold1 sem dados validos."
-    if ho_dis is None:
-        return f"INCONCLUSIVO: Holdout sem dados. Fold1 disorder={f1_dis:.1f}"
+def print_comparison(v1_fold1: dict, v1_holdout: dict,
+                     v2_holdout: dict, v2_fold1: dict | None = None) -> None:
+    def row(label, m, note=""):
+        d = m["disorder"]
+        c = m["coherence"]
+        dis = f"{d['disorder_score']:5.1f}" if d.get("available") else "  N/A"
+        coh = f"{c['coherence_score']:5.1f}" if c.get("available") else "  N/A"
+        n_d = d.get("n_windows", 0)
+        n_c = c.get("n_windows", 0)
+        print(f"  {label:<26} disorder={dis}  coherence={coh}  ({n_d}/{n_c} windows)  {note}")
 
-    delta = f1_dis - ho_dis
-    f1_str = f"disorder={f1_dis:.1f}, coherence={f1_coh:.1f}" if f1_coh else f"disorder={f1_dis:.1f}"
-    ho_str = f"disorder={ho_dis:.1f}, coherence={ho_coh:.1f}" if ho_coh else f"disorder={ho_dis:.1f}"
-
-    if delta > 5:
-        verdict = (
-            f"SIM - disorder era MAIOR no Fold1 (delta={delta:+.1f}). "
-            f"Mercado mais caotico em dez2024-fev2025: "
-            f"sinais de reversao do Sistema 1 falharam."
-        )
-    elif delta < -5:
-        verdict = (
-            f"NAO - disorder era MENOR no Fold1 (delta={delta:+.1f}). "
-            f"Desordem fractal nao explica as perdas; "
-            f"outro fator dominante (ex: tendencia EMA200 em downtrend)."
-        )
+    print("\n-- Comparison: v1 (5m/15m 60min) vs v2 (1m/5m 15min) --")
+    print(f"  {'Label':<26} {'disorder':>12}  {'coherence':>12}  windows")
+    print("  " + "-" * 70)
+    row("Fold1   v1 [5m/15m  60min]", v1_fold1,   "set-fev 2024-25 (MT5 5m)")
+    if v2_fold1:
+        row("Fold1   v2 [1m/5m   15min]", v2_fold1, "limited MT5 1m")
     else:
-        verdict = (
-            f"NEUTRO - disorder Fold1 aprox. Holdout (delta={delta:+.1f}, dentro de +-5). "
-            f"Sem diferenca estrutural de desordem entre os periodos."
-        )
+        print(f"  {'Fold1   v2 [1m/5m   15min]':<26} {'UNAVAILABLE':>12}  "
+              "  Clear retains ~60d of 1m; Fold1 is 15mo ago")
+    print("  " + "-" * 70)
+    row("Holdout v1 [5m/15m  60min]", v1_holdout, "mar-mai 2026 (yfinance 5m)")
+    row("Holdout v2 [1m/5m   15min]", v2_holdout, "mar-mai 2026 (MT5 1m)")
 
-    if f1_coh is not None and ho_coh is not None:
-        dcoh = f1_coh - ho_coh
-        verdict += f" Coerencia {'maior' if dcoh > 0 else 'menor'} no Fold1 (delta={dcoh:+.1f})."
+    # Answer the key question
+    d_v1 = v1_holdout["disorder"].get("disorder_score")
+    d_v2 = v2_holdout["disorder"].get("disorder_score")
+    c_v1 = v1_holdout["coherence"].get("coherence_score")
+    c_v2 = v2_holdout["coherence"].get("coherence_score")
 
-    return f"{verdict} | Fold1: {f1_str} | Holdout: {ho_str}"
+    print()
+    if d_v1 and d_v2:
+        delta_d = d_v2 - d_v1
+        delta_c = (c_v2 - c_v1) if c_v1 and c_v2 else None
+        direction = "AUMENTOU" if delta_d > 2 else ("DIMINUIU" if delta_d < -2 else "MANTEVE-SE SIMILAR")
+        print(f"  Granularidade 1m vs 5m (Holdout): disorder {direction} ({delta_d:+.1f})")
+        if delta_c:
+            print(f"  Coherence: {'maior' if delta_c > 0 else 'menor'} com 1m ({delta_c:+.1f})")
+        print()
+        if delta_d > 2:
+            print("  INTERPRETACAO: 1m captura mais ruido/microestrutura que o 5m.")
+            print("  Se Fold1 1m tivesse sido medido, disorder provavelmente seria ainda")
+            print(f"  mais alto que {v1_fold1['disorder'].get('disorder_score', '?'):.1f} (v1 5m Fold1).")
+        elif abs(delta_d) <= 2:
+            print("  INTERPRETACAO: Granularidade nao altera o sinal significativamente.")
+            print("  disorder_score e robusto entre 1m e 5m para este par/periodo.")
+        else:
+            print("  INTERPRETACAO: 1m mostra MENOS disorder que 5m (incomum).")
+            print("  Possivelmente porque 5m suaviza ruido mas 1m reverte para sinal limpo.")
 
 
-def save_report(fold1: dict, holdout: dict) -> dict:
+# ── Report update ─────────────────────────────────────────────────────────────
+
+def save_report(v1_fold1: dict, v1_holdout: dict, v2_holdout: dict,
+                v2_fold1: dict | None) -> None:
     report = {}
     if REPORT_PATH.exists():
         with open(REPORT_PATH, encoding="utf-8") as f:
             report = json.load(f)
 
-    f1_dis = fold1["disorder"].get("disorder_score")
-    f1_coh = fold1["coherence"].get("coherence_score")
-    ho_dis = holdout["disorder"].get("disorder_score")
-    ho_coh = holdout["coherence"].get("coherence_score")
+    d_v1 = v1_holdout["disorder"].get("disorder_score")
+    d_v2 = v2_holdout["disorder"].get("disorder_score")
+    c_v1 = v1_holdout["coherence"].get("coherence_score")
+    c_v2 = v2_holdout["coherence"].get("coherence_score")
 
     report["updated_at"] = datetime.now(timezone.utc).isoformat()
-    report["method"]     = f"5m_vs_15m_resampled  window={WINDOW_MINUTES}min"
-    report["fold1_5m"] = {
-        "source": str(CSV_5M_FOLD1.name),
-        "coherence": fold1["coherence"],
-        "disorder":  fold1["disorder"],
+
+    # Persist v1 baselines so future runs can reload them
+    if v1_fold1["disorder"].get("available"):
+        report["fold1_5m"] = {"method": "5m_vs_15m window=60min",
+                               "coherence": v1_fold1["coherence"],
+                               "disorder":  v1_fold1["disorder"]}
+    if v1_holdout["disorder"].get("available"):
+        report["holdout_5m"] = {"method": "5m_vs_15m window=60min",
+                                 "coherence": v1_holdout["coherence"],
+                                 "disorder":  v1_holdout["disorder"]}
+
+    report["v2_1m_5m"] = {
+        "method": "1m_vs_5m_mt5  window=15min",
+        "broker_1m_retention": "~60 days (Clear)",
+        "fold1_1m_available": False,
+        "fold1_1m_note": "Fold1 (set2024-fev2025) is 15+ months ago; Clear retains only ~60d of 1m data",
+        "holdout_v2": {
+            "coherence": v2_holdout["coherence"],
+            "disorder":  v2_holdout["disorder"],
+        },
+        "fold1_v2": v2_fold1 if v2_fold1 else None,
     }
-    report["holdout_5m"] = {
-        "source": "yfinance cache",
-        "coherence": holdout["coherence"],
-        "disorder":  holdout["disorder"],
-    }
-    report["comparison"] = {
-        "fold1_disorder":  f1_dis,
-        "fold1_coherence": f1_coh,
-        "holdout_disorder":  ho_dis,
-        "holdout_coherence": ho_coh,
-        "disorder_delta_fold1_minus_holdout":  round(f1_dis - ho_dis, 2) if f1_dis and ho_dis else None,
-        "coherence_delta_fold1_minus_holdout": round(f1_coh - ho_coh, 2) if f1_coh and ho_coh else None,
-    }
-    report["answer"] = build_answer(f1_dis, f1_coh, ho_dis, ho_coh)
+
+    if d_v1 and d_v2:
+        delta = d_v2 - d_v1
+        direction = "INCREASED" if delta > 2 else ("DECREASED" if delta < -2 else "SIMILAR")
+        report["v2_1m_5m"]["granularity_comparison"] = {
+            "holdout_v1_disorder": d_v1,
+            "holdout_v2_disorder": d_v2,
+            "delta": round(delta, 2),
+            "direction": direction,
+            "answer": (
+                f"Com 1m (mais granular) o disorder {direction.lower()} "
+                f"(delta={delta:+.1f}) vs 5m. "
+                f"Fold1 1m indisponivel na Clear (limite ~60d)."
+            ),
+        }
 
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False, default=str)
-
-    return report
+    print(f"\n[report] Saved to {REPORT_PATH}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--export", action="store_true",
-                        help="Re-download Fold1 5m from MT5 before running (MT5 must be open)")
+    parser.add_argument("--skip-export", action="store_true",
+                        help="Reuse existing holdout CSVs without connecting to MT5")
+    parser.add_argument("--fold1-attempt", action="store_true",
+                        help="Also attempt Fold1 1m export (will document broker limit)")
     args = parser.parse_args()
 
     print("=" * 64)
-    print("  Fractal Lab - 5m vs 15m  |  Fold1 vs Holdout")
-    print(f"  Window: {WINDOW_MINUTES}min  |  Micro: 5m  |  Macro: 15m (resampled)")
+    print("  Fractal Lab v2 - 1m real data via MT5 Clear")
+    print("  v2: 1m vs 5m, 15min windows")
+    print("  v1: 5m vs 15m, 60min windows  (reference)")
     print("=" * 64)
 
-    if args.export:
-        export_from_mt5()
+    # --- Export Holdout 1m + 5m from MT5 ---
+    df_1m_ho, df_5m_ho = export_holdout(skip_if_exists=args.skip_export)
 
-    # Load data
-    df_fold1   = load_fold1_5m()
-    df_holdout = load_holdout_5m()
+    # --- Optionally attempt Fold1 1m ---
+    v2_fold1 = None
+    if args.fold1_attempt:
+        df_1m_fold1_attempt = attempt_fold1_1m()
+        if not df_1m_fold1_attempt.empty:
+            df_5m_fold1 = _load_csv(CSV_5M_FOLD1)
+            print("\n[v2-fold1] Computing 1m vs 5m metrics for Fold1 ...")
+            v2_fold1 = run_metrics(df_1m_fold1_attempt, df_5m_fold1,
+                                   "Fold1 1m vs 5m", window_minutes=15)
 
-    # Compute metrics
-    print(f"\n[fold1]   Computing metrics...")
-    fold1_metrics   = run_metrics(df_fold1, "Fold1")
+    # --- Compute v1: 5m vs 15m for both periods (reference baseline) ---
+    print("\n[v1-fold1] 5m vs 15m, 60min windows (reference) ...")
+    if CSV_5M_FOLD1.exists():
+        df_5m_fold1 = _load_csv(CSV_5M_FOLD1)
+        df_15m_fold1 = df_5m_fold1.resample("15min").agg(
+            {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}
+        ).dropna(subset=["Open", "Close"])
+        print(f"  5m: {len(df_5m_fold1):,}  15m: {len(df_15m_fold1):,}")
+        v1_fold1 = run_metrics(df_5m_fold1, df_15m_fold1, "Fold1 5m/15m", window_minutes=60)
+    else:
+        print(f"  [SKIP] {CSV_5M_FOLD1.name} not found")
+        v1_fold1 = {"coherence": {"available": False}, "disorder": {"available": False}}
 
-    print(f"\n[holdout] Computing metrics...")
-    holdout_metrics = run_metrics(df_holdout, "Holdout")
+    print("\n[v1-holdout] 5m vs 15m, 60min windows (reference) ...")
+    if CSV_5M_HOLDOUT.exists():
+        df_5m_ho_v1 = _load_csv(CSV_5M_HOLDOUT)
+        df_15m_ho_v1 = df_5m_ho_v1.resample("15min").agg(
+            {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}
+        ).dropna(subset=["Open", "Close"])
+        print(f"  5m: {len(df_5m_ho_v1):,}  15m: {len(df_15m_ho_v1):,}")
+        v1_holdout = run_metrics(df_5m_ho_v1, df_15m_ho_v1, "Holdout 5m/15m", window_minutes=60)
+    else:
+        v1_holdout = {"coherence": {"available": False}, "disorder": {"available": False}}
 
-    # Save and show results
-    report = save_report(fold1_metrics, holdout_metrics)
+    # --- Compute v2: 1m vs 5m for Holdout ---
+    print(f"\n[v2-holdout] 1m: {len(df_1m_ho):,} candles  |  5m: {len(df_5m_ho):,} candles")
+    print("[v2-holdout] Computing coherence + disorder (1m vs 5m, 15min windows) ...")
+    v2_holdout = run_metrics(df_1m_ho, df_5m_ho, "Holdout 1m vs 5m", window_minutes=15)
 
-    print(f"\n{'='*64}")
-    print("PERGUNTA: disorder_score era maior antes dos trades ruins do Sistema 1?")
-    print(f"RESPOSTA: {report['answer']}")
-    print(f"{'='*64}")
+    # --- Print comparison ---
+    print_comparison(v1_fold1, v1_holdout, v2_holdout, v2_fold1)
 
-    print("\n-- Distribuicao dos scores --")
-    for label, m in [("Fold1  ", fold1_metrics), ("Holdout", holdout_metrics)]:
-        d = m["disorder"]
-        c = m["coherence"]
-        if d.get("available"):
-            p = d["percentiles"]
-            print(f"  {label} disorder   p25={p['p25']:5.1f}  p50={p['p50']:5.1f}  p75={p['p75']:5.1f}  mean={d['disorder_score']:5.1f}")
-        if c.get("available"):
-            p = c["percentiles"]
-            print(f"  {label} coherence  p25={p['p25']:5.1f}  p50={p['p50']:5.1f}  p75={p['p75']:5.1f}  mean={c['coherence_score']:5.1f}")
-
-    print(f"\n[report] Saved to {REPORT_PATH}")
+    # --- Save report ---
+    save_report(v1_fold1, v1_holdout, v2_holdout, v2_fold1)
 
 
 if __name__ == "__main__":

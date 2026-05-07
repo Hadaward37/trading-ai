@@ -480,5 +480,100 @@
     "disorder_delta_fold1_minus_holdout": null,
     "coherence_delta_fold1_minus_holdout": null
   },
-  "answer": "INCONCLUSIVO — Fold1 sem dados 1m/5m via yfinance (limite: 60d para 5m, 7d para 1m). Holdout atual: disorder=21.0, coherence=49.3. Para comparação completa, exportar histórico do MT5 e rodar compute_coherence/compute_disorder diretamente."
+  "answer": "INCONCLUSIVO — Fold1 sem dados 1m/5m via yfinance (limite: 60d para 5m, 7d para 1m). Holdout atual: disorder=21.0, coherence=49.3. Para comparação completa, exportar histórico do MT5 e rodar compute_coherence/compute_disorder diretamente.",
+  "updated_at": "2026-05-07T17:07:49.871202+00:00",
+  "v2_1m_5m": {
+    "method": "1m_vs_5m_mt5  window=15min",
+    "broker_1m_retention": "~60 days (Clear)",
+    "fold1_1m_available": false,
+    "fold1_1m_note": "Fold1 (set2024-fev2025) is 15+ months ago; Clear retains only ~60d of 1m data",
+    "holdout_v2": {
+      "coherence": {
+        "coherence_score": 36.42,
+        "n_windows": 4009,
+        "percentiles": {
+          "p10": 28.0,
+          "p25": 32.0,
+          "p50": 36.0,
+          "p75": 40.96,
+          "p90": 46.45
+        },
+        "available": true
+      },
+      "disorder": {
+        "disorder_score": 33.4,
+        "n_windows": 4197,
+        "percentiles": {
+          "p10": 23.62,
+          "p25": 28.29,
+          "p50": 33.74,
+          "p75": 38.85,
+          "p90": 42.98
+        },
+        "available": true
+      }
+    },
+    "fold1_v2": null,
+    "granularity_comparison": {
+      "holdout_v1_disorder": 35.75,
+      "holdout_v2_disorder": 33.4,
+      "delta": -2.35,
+      "direction": "DECREASED",
+      "answer": "Com 1m (mais granular) o disorder decreased (delta=-2.4) vs 5m. Fold1 1m indisponivel na Clear (limite ~60d)."
+    }
+  },
+  "fold1_5m": {
+    "method": "5m_vs_15m window=60min",
+    "coherence": {
+      "coherence_score": 36.36,
+      "n_windows": 980,
+      "percentiles": {
+        "p10": 27.42,
+        "p25": 30.0,
+        "p50": 35.0,
+        "p75": 40.61,
+        "p90": 48.82
+      },
+      "available": true
+    },
+    "disorder": {
+      "disorder_score": 34.9,
+      "n_windows": 1045,
+      "percentiles": {
+        "p10": 24.09,
+        "p25": 29.61,
+        "p50": 35.03,
+        "p75": 40.9,
+        "p90": 45.26
+      },
+      "available": true
+    }
+  },
+  "holdout_5m": {
+    "method": "5m_vs_15m window=60min",
+    "coherence": {
+      "coherence_score": 36.11,
+      "n_windows": 990,
+      "percentiles": {
+        "p10": 27.42,
+        "p25": 30.0,
+        "p50": 35.0,
+        "p75": 40.61,
+        "p90": 48.82
+      },
+      "available": true
+    },
+    "disorder": {
+      "disorder_score": 35.75,
+      "n_windows": 1049,
+      "percentiles": {
+        "p10": 25.29,
+        "p25": 30.91,
+        "p50": 36.01,
+        "p75": 40.87,
+        "p90": 45.62
+      },
+      "available": true
+    }
+  }
 }
