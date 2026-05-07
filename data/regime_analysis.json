@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-07T17:45:47.480610+00:00",
+  "generated_at": "2026-05-07T18:12:17.714543+00:00",
   "period": "all",
   "regime_definitions": {
     "REGIME_1_STRESS": {
@@ -19,6 +19,13 @@
       "priority": 3
     }
   },
+  "dual_slope_definition": {
+    "slope_short": "EMA200[t-1] - EMA200[t-6]",
+    "slope_mid": "EMA200[t-1] - EMA200[t-21]",
+    "BULL": "slope_short > 0 AND slope_mid > 0",
+    "BEAR": "slope_short < 0 AND slope_mid < 0",
+    "NEUTRAL": "slopes diverge"
+  },
   "distribution": {
     "REGIME_1_STRESS": 4663,
     "REGIME_2_COMPRESSED": 886,
@@ -31,7 +38,7 @@
     "overall_win_rate": 0.4,
     "mean_pnl_pips": 6.93
   },
-  "regime_stats": [
+  "v1_regime_stats": [
     {
       "regime": "REGIME_1_STRESS",
       "n_trades": 154,
@@ -60,7 +67,7 @@
       "max_drawdown_pips": 1436.03
     }
   ],
-  "ks_results": {
+  "v1_ks_results": {
     "REGIME_1_STRESS_vs_REGIME_2_COMPRESSED": {
       "ks_stat": NaN,
       "p_value": NaN,
@@ -89,14 +96,76 @@
       ]
     }
   },
-  "separability": {
+  "v1_separability": {
     "REGIME_SEPARABILITY_SCORE": 0.8598,
     "ks_score": 0.9862,
     "e_score": 1.0,
     "sig_pairs": 0.3333,
     "verdict": "SEPARABLE — regimes são estatisticamente distintos"
   },
-  "answer": "SIM — Score=0.86. Regimes separaveis (KS p<0.05). Melhor: REGIME_1_STRESS E=+13.89pips  |  Pior: REGIME_3_STRUCTURED E=-0.66pips. Filtrar 'REGIME_3_STRUCTURED' aumentaria expectativa. ATENCAO: resultado e period-specific (bullish Jan-Mai2026); validar em Fold1 antes de implementar.",
+  "v1_answer": "SIM — Score=0.86. Regimes separaveis (KS p<0.05). Melhor: REGIME_1_STRESS E=+13.89pips  |  Pior: REGIME_3_STRUCTURED E=-0.66pips. Filtrar 'REGIME_3_STRUCTURED' aumentaria expectativa. ATENCAO: resultado e period-specific (bullish Jan-Mai2026); validar em Fold1 antes de implementar.",
+  "v2_alignment": {
+    "bias_distribution": {
+      "BULL": 82,
+      "BEAR": 203,
+      "NEUTRAL": 25
+    },
+    "aligned_trades": 37,
+    "aligned_pct": 0.1194,
+    "alignment_stats": [
+      {
+        "label": "STRESS + ALIGNED",
+        "n_trades": 11,
+        "win_rate": 0.4545,
+        "profit_factor": 1.09,
+        "expectancy_pips": 1.28,
+        "sharpe_proxy": 0.036,
+        "max_drawdown_pips": 74.69
+      },
+      {
+        "label": "STRESS + NOT_ALIGNED",
+        "n_trades": 143,
+        "win_rate": 0.5734,
+        "profit_factor": 1.965,
+        "expectancy_pips": 14.86,
+        "sharpe_proxy": 0.311,
+        "max_drawdown_pips": 487.71
+      },
+      {
+        "label": "STRUCTURED + ALIGNED",
+        "n_trades": 26,
+        "win_rate": 0.4615,
+        "profit_factor": 0.738,
+        "expectancy_pips": -5.22,
+        "sharpe_proxy": -0.131,
+        "max_drawdown_pips": 409.05
+      },
+      {
+        "label": "STRUCTURED + NOT_ALIGNED",
+        "n_trades": 126,
+        "win_rate": 0.4127,
+        "profit_factor": 1.014,
+        "expectancy_pips": 0.28,
+        "sharpe_proxy": 0.007,
+        "max_drawdown_pips": 1026.98
+      }
+    ],
+    "ks_stress_aligned_vs_not": {
+      "pair": "STRESS_ALIGNED_vs_STRESS_NOT_ALIGNED",
+      "ks_stat": 0.2867,
+      "p_value": 0.3182,
+      "significant": false,
+      "n": [
+        11,
+        143
+      ]
+    },
+    "answers": {
+      "STRESS_ALIGNED tem E maior que STRESS isolado da v1?": "STRESS_ALIGNED E=+1.28pips (n=11) vs STRESS_v1 E=+13.89pips. Delta=-12.61pips -> MENOR. KS p=0.3182 (n.s.)",
+      "Qual o PF do STRESS_NOT_ALIGNED?": "PF=1.97 (n=143, E=+14.86pips) -> positivo (edge presente)",
+      "Quantos trades sobram com filtro is_aligned=TRUE?": "37 / 310 trades (11.9%) passam pelo filtro is_aligned=TRUE. E_aligned=-3.29pips vs E_all=+6.93pips"
+    }
+  },
   "tagged_trades_sample": [
     {
       "datetime": "2026-01-09 08:00:00",
@@ -104,7 +173,9 @@
       "entry": 1.16488,
       "outcome": "SL_HIT",
       "pnl_pips": -20.7,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 11:00:00",
@@ -112,7 +183,9 @@
       "entry": 1.16422,
       "outcome": "TP_HIT",
       "pnl_pips": 34.7,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 14:00:00",
@@ -120,7 +193,9 @@
       "entry": 1.16412,
       "outcome": "TP_HIT",
       "pnl_pips": 33.5,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 16:00:00",
@@ -128,7 +203,9 @@
       "entry": 1.16364,
       "outcome": "TP_HIT",
       "pnl_pips": 44.8,
-      "regime": "REGIME_1_STRESS"
+      "regime": "REGIME_1_STRESS",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 18:00:00",
@@ -136,7 +213,9 @@
       "entry": 1.16332,
       "outcome": "TP_HIT",
       "pnl_pips": 49.0,
-      "regime": "REGIME_1_STRESS"
+      "regime": "REGIME_1_STRESS",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 19:00:00",
@@ -144,7 +223,9 @@
       "entry": 1.16315,
       "outcome": "TP_HIT",
       "pnl_pips": 47.4,
-      "regime": "REGIME_1_STRESS"
+      "regime": "REGIME_1_STRESS",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 20:00:00",
@@ -152,7 +233,9 @@
       "entry": 1.16338,
       "outcome": "TP_HIT",
       "pnl_pips": 46.6,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-09 23:00:00",
@@ -160,7 +243,9 @@
       "entry": 1.16367,
       "outcome": "TP_HIT",
       "pnl_pips": 42.0,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-12 00:00:00",
@@ -168,7 +253,9 @@
       "entry": 1.16313,
       "outcome": "TP_HIT",
       "pnl_pips": 42.3,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-12 01:00:00",
@@ -176,7 +263,9 @@
       "entry": 1.16236,
       "outcome": "TP_HIT",
       "pnl_pips": 42.7,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-13 13:00:00",
@@ -184,7 +273,9 @@
       "entry": 1.16684,
       "outcome": "SL_HIT",
       "pnl_pips": -22.4,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-13 14:00:00",
@@ -192,7 +283,9 @@
       "entry": 1.1655,
       "outcome": "TP_HIT",
       "pnl_pips": 38.0,
-      "regime": "REGIME_1_STRESS"
+      "regime": "REGIME_1_STRESS",
+      "market_bias": -1,
+      "is_aligned": true
     },
     {
       "datetime": "2026-01-14 08:00:00",
@@ -200,7 +293,9 @@
       "entry": 1.16489,
       "outcome": "SL_HIT",
       "pnl_pips": -20.7,
-      "regime": "REGIME_2_COMPRESSED"
+      "regime": "REGIME_2_COMPRESSED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-14 20:00:00",
@@ -208,7 +303,9 @@
       "entry": 1.16378,
       "outcome": "TP_HIT",
       "pnl_pips": 39.1,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": true
     },
     {
       "datetime": "2026-01-15 15:00:00",
@@ -216,7 +313,9 @@
       "entry": 1.16012,
       "outcome": "TP_HIT",
       "pnl_pips": 37.9,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-15 16:00:00",
@@ -224,7 +323,9 @@
       "entry": 1.1601,
       "outcome": "TP_HIT",
       "pnl_pips": 40.3,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-15 17:00:00",
@@ -232,7 +333,9 @@
       "entry": 1.16022,
       "outcome": "TP_HIT",
       "pnl_pips": 41.0,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-15 18:00:00",
@@ -240,7 +343,9 @@
       "entry": 1.16044,
       "outcome": "TP_HIT",
       "pnl_pips": 41.7,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-15 19:00:00",
@@ -248,7 +353,9 @@
       "entry": 1.16089,
       "outcome": "TP_HIT",
       "pnl_pips": 41.7,
-      "regime": "REGIME_3_STRUCTURED"
+      "regime": "REGIME_3_STRUCTURED",
+      "market_bias": -1,
+      "is_aligned": false
     },
     {
       "datetime": "2026-01-15 22:00:00",
@@ -256,7 +363,9 @@
       "entry": 1.16042,
       "outcome": "TP_HIT",
       "pnl_pips": 40.2,
-      "regime": "REGIME_1_STRESS"
+      "regime": "REGIME_1_STRESS",
+      "market_bias": -1,
+      "is_aligned": false
     }
   ]
 }

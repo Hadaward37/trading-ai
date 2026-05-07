@@ -36,6 +36,16 @@ COHERENCE_ROLL_WINDOW = 8    # bars for rolling coherence proxy (~8H = 2×4H can
 
 OUTCOME_MAX_BARS     = 48    # max forward bars to resolve TP/SL
 
+# ── Dual-slope alignment constants ───────────────────────────────────────────
+
+EMA200_PERIOD     = 200  # EMA lookback
+SLOPE_SHORT_LAG   = 5    # slope_short = EMA200[t-1] - EMA200[t-6]
+SLOPE_MID_LAG     = 20   # slope_mid   = EMA200[t-1] - EMA200[t-21]
+
+BIAS_BULL    =  1
+BIAS_BEAR    = -1
+BIAS_NEUTRAL =  0
+
 
 # ── Feature computation ───────────────────────────────────────────────────────
 
@@ -97,6 +107,24 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     if "adx" not in df.columns:
         df["adx"] = np.nan
 
+    # EMA200 dual-slope market bias (causal: uses t-1 through t-21)
+    ema200 = df["Close"].ewm(span=EMA200_PERIOD, adjust=False).mean()
+    df["ema200"]      = ema200
+    df["slope_short"] = ema200.shift(1) - ema200.shift(1 + SLOPE_SHORT_LAG)
+    df["slope_mid"]   = ema200.shift(1) - ema200.shift(1 + SLOPE_MID_LAG)
+
+    def _market_bias(row):
+        ss, sm = row["slope_short"], row["slope_mid"]
+        if pd.isna(ss) or pd.isna(sm):
+            return BIAS_NEUTRAL
+        if ss > 0 and sm > 0:
+            return BIAS_BULL
+        if ss < 0 and sm < 0:
+            return BIAS_BEAR
+        return BIAS_NEUTRAL
+
+    df["market_bias"] = df.apply(_market_bias, axis=1)
+
     df = df.drop(columns=["_atr_raw"])
     return df
 
@@ -137,6 +165,151 @@ def tag_regimes(df_features: pd.DataFrame) -> pd.DataFrame:
     df = df_features.copy()
     df["regime"] = df.apply(classify_regime, axis=1)
     return df
+
+
+# ── Dual-slope alignment ─────────────────────────────────────────────────────
+
+def compute_alignment(signal: int, market_bias: int) -> bool:
+    """
+    Return True if the trade direction is aligned with the dual-slope market bias.
+
+    is_aligned = True  when signal=1  (BUY)  and market_bias == BIAS_BULL
+    is_aligned = True  when signal=-1 (SELL) and market_bias == BIAS_BEAR
+    is_aligned = False when market_bias == BIAS_NEUTRAL or direction opposes bias
+    """
+    if market_bias == BIAS_NEUTRAL:
+        return False
+    if signal == 1 and market_bias == BIAS_BULL:
+        return True
+    if signal == -1 and market_bias == BIAS_BEAR:
+        return True
+    return False
+
+
+def tag_alignment(df_trades: pd.DataFrame,
+                  df_features: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add market_bias and is_aligned to each trade using features at entry time.
+
+    No look-ahead: uses the feature row whose timestamp <= trade entry time.
+    Requires df_features to have 'market_bias' column (from compute_features).
+    """
+    df_feat = df_features.copy()
+    if not isinstance(df_feat.index, pd.DatetimeIndex):
+        df_feat = df_feat.set_index("datetime")
+    df_feat.index = pd.to_datetime(df_feat.index).floor("h")
+
+    biases, aligned_flags = [], []
+
+    for _, trade in df_trades.iterrows():
+        entry_dt = pd.to_datetime(trade["datetime"]).floor("h")
+        past = df_feat[df_feat.index <= entry_dt]
+
+        if past.empty or "market_bias" not in past.columns:
+            bias = BIAS_NEUTRAL
+        else:
+            bias = int(past["market_bias"].iloc[-1])
+
+        sig = int(trade["signal"])
+        biases.append(bias)
+        aligned_flags.append(compute_alignment(sig, bias))
+
+    df_out = df_trades.copy()
+    df_out["market_bias"] = biases
+    df_out["is_aligned"]  = aligned_flags
+    return df_out
+
+
+def _grp_stats(grp: pd.DataFrame, label: str) -> dict:
+    """Compute trading stats for a group of trades."""
+    if len(grp) == 0:
+        return {"label": label, "n_trades": 0,
+                "win_rate": np.nan, "profit_factor": np.nan,
+                "expectancy_pips": np.nan, "sharpe_proxy": np.nan,
+                "max_drawdown_pips": np.nan}
+
+    wins   = grp[grp["pnl_pips"] > 0]["pnl_pips"]
+    losses = grp[grp["pnl_pips"] <= 0]["pnl_pips"]
+    total_win  = float(wins.sum())
+    total_loss = float(losses.sum())
+    if total_loss >= 0:
+        total_loss = -1e-9
+
+    pf     = total_win / abs(total_loss) if total_win > 0 else 0.0
+    e      = float(grp["pnl_pips"].mean())
+    sharpe = e / grp["pnl_pips"].std() if grp["pnl_pips"].std() > 0 else 0.0
+
+    cum = grp.sort_values("datetime")["pnl_pips"].cumsum()
+    drawdown = float((cum.cummax() - cum).max())
+
+    return {
+        "label": label,
+        "n_trades": len(grp),
+        "win_rate": round(len(wins) / len(grp), 4),
+        "profit_factor": round(pf, 3),
+        "expectancy_pips": round(e, 2),
+        "sharpe_proxy": round(sharpe, 3),
+        "max_drawdown_pips": round(drawdown, 2),
+    }
+
+
+def alignment_stats(df_tagged: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute stats for regime × alignment combinations.
+
+    Returns DataFrame with one row per combination:
+      REGIME_1_STRESS + ALIGNED
+      REGIME_1_STRESS + NOT_ALIGNED
+      REGIME_3_STRUCTURED + ALIGNED
+      REGIME_3_STRUCTURED + NOT_ALIGNED
+    """
+    combos = [
+        (REGIME_STRESS,     True,  "STRESS + ALIGNED"),
+        (REGIME_STRESS,     False, "STRESS + NOT_ALIGNED"),
+        (REGIME_STRUCTURED, True,  "STRUCTURED + ALIGNED"),
+        (REGIME_STRUCTURED, False, "STRUCTURED + NOT_ALIGNED"),
+    ]
+    records = []
+    for regime, aligned, label in combos:
+        grp = df_tagged[
+            (df_tagged["regime"] == regime) &
+            (df_tagged["is_aligned"] == aligned)
+        ]
+        records.append(_grp_stats(grp, label))
+    return pd.DataFrame(records).set_index("label")
+
+
+def ks_test_alignment(df_tagged: pd.DataFrame) -> dict:
+    """
+    KS-test comparing STRESS_ALIGNED vs STRESS_NOT_ALIGNED return distributions.
+
+    Returns result dict with ks_stat, p_value, significant, and n tuple.
+    """
+    aligned     = df_tagged[
+        (df_tagged["regime"] == REGIME_STRESS) & (df_tagged["is_aligned"] == True)
+    ]["pnl_pips"].dropna()
+
+    not_aligned = df_tagged[
+        (df_tagged["regime"] == REGIME_STRESS) & (df_tagged["is_aligned"] == False)
+    ]["pnl_pips"].dropna()
+
+    if len(aligned) < 10 or len(not_aligned) < 10:
+        return {
+            "pair": "STRESS_ALIGNED_vs_STRESS_NOT_ALIGNED",
+            "ks_stat": np.nan, "p_value": np.nan,
+            "significant": False,
+            "n": (len(aligned), len(not_aligned)),
+            "note": "Insufficient samples (< 10 per group)",
+        }
+
+    ks, pv = stats.ks_2samp(aligned.values, not_aligned.values)
+    return {
+        "pair": "STRESS_ALIGNED_vs_STRESS_NOT_ALIGNED",
+        "ks_stat": round(float(ks), 4),
+        "p_value": round(float(pv), 4),
+        "significant": bool(pv < 0.05),
+        "n": (len(aligned), len(not_aligned)),
+    }
 
 
 # ── Trade outcome resolution ──────────────────────────────────────────────────
