@@ -292,6 +292,41 @@ REGIME_ATR_RATIO_MAX  = 1.5
 - **Nunca retreinar** sem nova auditoria walk-forward completa
 - **Fractal Lab (revisado):** disorder_score descartado como filtro — não discrimina Fold1 do Holdout em fonte consistente (MT5). disorder robusto entre granularidades (delta 1m/5m vs 5m/15m = −2.4).
 - **EMA200 slope (novo):** Investigar EMA200 slope como filtro adicional — bloquear sinais de reversão quando slope < −0.10 pips/candle (abaixo da metade do valor tóxico do Fold1: −0.289)
+- **Adaptive Sizing (PRIORITÁRIO):** Implementar tabela de sizing baseada em stretch (ver abaixo) — maior impacto de risco por unidade de esforço.
+
+### Achado crítico — Fractal Lab v3: Stretch Analysis (2026-05-07)
+
+**Causa do timing de entrada:** `BB_DEV=2.0` em `config.py` + `BB_WINDOW=20` cria banda de 2.41 ATR de largura média. Quando `v_bb_buy` (em `core/signals.py` linha 43) dispara, o preço já está em B5 (>2 ATR da média). Este comportamento é **estruturalmente correto** — não é um bug, é um filtro implícito de exaustão.
+
+**Evidência quantitativa (310 trades, jan–mai2026):**
+
+| Bucket | N | % | PF | E (pips) | Win Rate |
+|--------|---|---|----|----------|----------|
+| B1–B2 [0–1.0 ATR] | 33 | 10.6% | 5.57 | +28.4 | 76% |
+| B3–B4 [1–2.0 ATR] | 42 | 13.6% | 3.25 | +21.2 | 69% |
+| **B5 [>2 ATR]** | **235** | **75.8%** | **1.06** | **+1.3** | **43%** |
+
+KS-test B1 vs B5: p=0.016 — **estatisticamente significativo**.
+
+**Simulação: entrada antecipada em B2 PIORA o sistema:**
+- Win Rate: 51.8% → 23.5% (−28.2%), MaxDD: +680 pips
+- O preço tipicamente continua de B2 para B5 (~3 ATR adicionais), derrubando o SL (2.5 ATR) antes de reverter.
+
+**Solução: Adaptive Sizing** — não mudar timing, mudar tamanho de posição:
+
+| Bucket | Sizing | PF atual |
+|--------|--------|----------|
+| B1 [0.0–0.5) | 1.0x | 5.53 |
+| B2 [0.5–1.0) | 1.0x | 5.61 |
+| B3 [1.0–1.5) | 0.7x | 3.59 |
+| B4 [1.5–2.0) | 0.3x | 3.02 |
+| **B5 [2.0+]** | **0.0x** | 1.06 |
+
+**Impacto simulado (310 trades):** MaxDD: 487 → **30 pips (−94%)**, Sharpe: 0.21 → **0.50 (+142%)**.
+
+> Detalhes: `research/fractal_lab/findings.md`
+> Simulação: `.\venv\Scripts\python scripts\simulate_early_entry.py`
+> Relatórios: `data/regime_analysis.json`, `data/early_entry_simulation.json`
 
 ---
 
