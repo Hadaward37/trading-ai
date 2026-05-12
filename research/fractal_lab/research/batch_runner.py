@@ -77,6 +77,31 @@ ASSETS: Dict[str, Dict] = {
         "pip_multiplier": 1.0,
         "category": "index",
     },
+    # ── Expanded universe ──────────────────────────────────────────────────────
+    "SPY": {
+        "ticker": "SPY",
+        "name": "S&P 500 ETF",
+        "pip_multiplier": 100.0,   # cents
+        "category": "us_etf",
+    },
+    "QQQ": {
+        "ticker": "QQQ",
+        "name": "NASDAQ ETF",
+        "pip_multiplier": 100.0,
+        "category": "us_etf",
+    },
+    "BTC": {
+        "ticker": "BTC-USD",
+        "name": "Bitcoin/USD",
+        "pip_multiplier": 1.0,     # USD per BTC point
+        "category": "crypto",
+    },
+    "DXY": {
+        "ticker": "DX-Y.NYB",
+        "name": "US Dollar Index",
+        "pip_multiplier": 1000.0,  # index milli-points
+        "category": "forex_index",
+    },
 }
 
 # ── Period definitions ─────────────────────────────────────────────────────────
@@ -298,6 +323,23 @@ def _report_to_row(
 
     dominant_regime, regime_pcts = _compute_regime_dist(test)
 
+    # Full per-regime breakdown (for analytics modules)
+    def _safe_regime_detail(period_result) -> Dict:
+        if period_result is None:
+            return {}
+        return {
+            r: {k: round(v, 4) if isinstance(v, float) else v
+                for k, v in m.items()}
+            for r, m in (period_result.regime_breakdown or {}).items()
+        }
+
+    pf_degradation = 0.0
+    if tm.get("profit_factor", 0) > 0:
+        pf_degradation = round(
+            (om.get("profit_factor", 0.0) - tm["profit_factor"]) / max(tm["profit_factor"], 0.001),
+            4,
+        )
+
     return {
         "asset":           asset_key,
         "asset_name":      asset_cfg["name"],
@@ -318,6 +360,7 @@ def _report_to_row(
         "oos_wr":          round(om.get("win_rate", 0.0), 4),
         "oos_expectancy":  round(om.get("expectancy_pips", 0.0), 2),
         "oos_verdict":     report.verdict,
+        "pf_degradation":  pf_degradation,
         "robustness":      round(report.robustness_score, 4),
         "rob_verdict":     mc.get("verdict", ""),
         "mc_prob_profit":  round(mc.get("prob_profitable", 0.0), 4),
@@ -328,6 +371,11 @@ def _report_to_row(
         "pct_mean_rev":    regime_pcts.get("MEAN_REVERTING", 0.0),
         "pct_high_vol":    regime_pcts.get("HIGH_VOLATILITY", 0.0),
         "pct_low_vol":     regime_pcts.get("LOW_VOLATILITY", 0.0),
+        # Full per-regime breakdown for analytics
+        "regime_detail":   {
+            "test": _safe_regime_detail(test),
+            "oos":  _safe_regime_detail(oos),
+        },
     }
 
 
@@ -692,6 +740,11 @@ def run_batch(
     }
     (output_dir / "batch_summary.json").write_text(
         json.dumps(summary, indent=2, default=str, ensure_ascii=True),
+        encoding="utf-8",
+    )
+    # Full results (includes regime_detail for analytics) -- separate file
+    (output_dir / "results_full.json").write_text(
+        json.dumps(all_rows, indent=2, default=str, ensure_ascii=True),
         encoding="utf-8",
     )
 

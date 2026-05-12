@@ -1,0 +1,9 @@
+hypothesis,group,avg_robustness,avg_pf_test,avg_pf_oos,avg_sharpe,n_pass,n_assets
+MR_RSI_Exhaust,mean_reversion,0.6571,1.3357,1.0962,0.1163,3,4
+MR_EMA_Dist,mean_reversion,0.5014,1.1663,1.1075,0.0630,4,4
+MR_BB_Stretch,mean_reversion,0.4594,1.2147,1.1280,0.0793,4,4
+TF_Breakout_20,trend_follow,0.3740,1.0470,0.9345,0.0125,0,4
+VOL_Range_Bkout,volatility,0.3622,1.6440,1.2937,0.1180,4,4
+VOL_ATR_Expand,volatility,0.3246,0.7658,1.2132,-0.1640,1,4
+TF_Momentum,trend_follow,0.2746,1.0097,0.9487,0.0045,1,4
+TF_EMA_Slope,trend_follow,0.2397,0.9615,1.0435,-0.0168,1,4

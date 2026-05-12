@@ -1,0 +1,98 @@
+========================================================================
+  REGIME ANALYTICS REPORT
+  Generated: 2026-05-12T00:49:26.914489
+  Total combinations loaded: 80
+========================================================================
+
+  HYPOTHESIS STABILITY RANKING (test period, higher = more consistent across regimes)
+
+  Hypothesis         Group           Stability  PF mean   PF std  Regimes Best regime        Worst regime      
+  ----------------------------------------------------------------------------------------------------
+  TF_Breakout_20     trend_follow       0.7739    0.942    0.213       26 TRENDING           LOW_VOLATILITY    
+  MR_EMA_Dist        mean_reversion     0.6810    1.063    0.339       32 MEAN_REVERTING     MEAN_REVERTING    
+  MR_BB_Stretch      mean_reversion     0.6685    1.144    0.379       30 MEAN_REVERTING     MEAN_REVERTING    
+  MR_RSI_Exhaust     mean_reversion     0.6622    1.162    0.392       32 HIGH_VOLATILITY    MEAN_REVERTING    
+  TF_EMA_Slope       trend_follow       0.6585    1.109    0.379       29 MEAN_REVERTING     HIGH_VOLATILITY   
+  TF_Momentum        trend_follow       0.6342    1.072    0.392       29 MEAN_REVERTING     HIGH_VOLATILITY   
+  VOL_ATR_Expand     volatility         0.5879    1.123    0.463        6 HIGH_VOLATILITY    HIGH_VOLATILITY   
+  VOL_Range_Bkout    volatility         0.0217    1.328    1.299       11 HIGH_VOLATILITY    HIGH_VOLATILITY   
+
+  OOS DEGRADATION BY REGIME (worst first)
+
+  Hypothesis         Asset    Regime                PF Test   PF OOS    Degr%   Stable
+  --------------------------------------------------------------------------------
+  TF_Momentum        GOLD     MEAN_REVERTING          2.715    0.770   -71.6%       NO
+  VOL_Range_Bkout    SPY      HIGH_VOLATILITY         5.171    1.502   -71.0%       NO
+  MR_EMA_Dist        DXY      MEAN_REVERTING          1.672    0.535   -68.0%       NO
+  MR_BB_Stretch      DXY      MEAN_REVERTING          1.947    0.658   -66.2%       NO
+  TF_Momentum        EURUSD   LOW_VOLATILITY          1.368    0.496   -63.7%       NO
+  MR_EMA_Dist        GOLD     LOW_VOLATILITY          1.090    0.397   -63.6%       NO
+  MR_RSI_Exhaust     BTC      LOW_VOLATILITY          1.382    0.515   -62.7%       NO
+  MR_RSI_Exhaust     DXY      MEAN_REVERTING          1.032    0.435   -57.9%       NO
+  TF_EMA_Slope       BTC      MEAN_REVERTING          1.316    0.566   -57.0%       NO
+  MR_RSI_Exhaust     ITUB4    HIGH_VOLATILITY         1.676    0.768   -54.2%       NO
+  TF_EMA_Slope       EURUSD   LOW_VOLATILITY          1.284    0.652   -49.2%       NO
+  MR_RSI_Exhaust     EURUSD   HIGH_VOLATILITY         1.929    1.035   -46.3%       NO
+  TF_EMA_Slope       BTC      LOW_VOLATILITY          1.902    1.058   -44.4%       NO
+  TF_Momentum        BTC      MEAN_REVERTING          1.073    0.616   -42.6%       NO
+  MR_RSI_Exhaust     QQQ      TRENDING                1.118    0.644   -42.4%       NO
+  VOL_ATR_Expand     NASDAQ   HIGH_VOLATILITY         1.888    1.097   -41.9%       NO
+  MR_EMA_Dist        IBOV     TRENDING                1.222    0.721   -41.0%       NO
+  MR_BB_Stretch      EURUSD   HIGH_VOLATILITY         1.594    0.963   -39.6%       NO
+  TF_Momentum        PETR4    HIGH_VOLATILITY         1.280    0.806   -37.0%       NO
+  VOL_Range_Bkout    BTC      LOW_VOLATILITY          1.136    0.719   -36.7%       NO
+
+  BEHAVIORAL MARKET MAP (which strategy dominates per asset x regime)
+
+  Asset    Regime                 Best Group           PF Best Hypothesis     
+  ----------------------------------------------------------------------------
+  BTC      HIGH_VOLATILITY        mean_reversion    1.276 MR_RSI_Exhaust      
+  BTC      LOW_VOLATILITY         mean_reversion    1.340 TF_EMA_Slope        
+  BTC      MEAN_REVERTING         trend_follow      1.195 TF_EMA_Slope        
+  BTC      TRENDING               mean_reversion    1.106 MR_RSI_Exhaust      
+
+  DXY      HIGH_VOLATILITY        mean_reversion    1.149 VOL_Range_Bkout     
+  DXY      LOW_VOLATILITY         mean_reversion    1.262 MR_EMA_Dist         
+  DXY      MEAN_REVERTING         mean_reversion    1.550 MR_BB_Stretch       
+  DXY      TRENDING               mean_reversion    1.188 MR_BB_Stretch       
+
+  EURUSD   HIGH_VOLATILITY        mean_reversion    1.700 MR_RSI_Exhaust      
+  EURUSD   LOW_VOLATILITY         trend_follow      1.264 MR_RSI_Exhaust      
+  EURUSD   MEAN_REVERTING         mean_reversion    1.056 MR_BB_Stretch       
+  EURUSD   TRENDING               mean_reversion    1.127 MR_RSI_Exhaust      
+
+  GOLD     HIGH_VOLATILITY        mean_reversion    1.010 TF_Breakout_20      
+  GOLD     LOW_VOLATILITY         mean_reversion    1.176 MR_BB_Stretch       
+  GOLD     MEAN_REVERTING         trend_follow      2.635 TF_Momentum         
+  GOLD     TRENDING               trend_follow      1.239 TF_Momentum         
+
+  IBOV     HIGH_VOLATILITY        mean_reversion    1.461 MR_RSI_Exhaust      
+  IBOV     TRENDING               trend_follow      1.205 TF_Breakout_20      
+
+  ITUB4    HIGH_VOLATILITY        mean_reversion    1.018 MR_RSI_Exhaust      
+  ITUB4    MEAN_REVERTING         mean_reversion    1.224 MR_RSI_Exhaust      
+  ITUB4    TRENDING               trend_follow      1.069 TF_Momentum         
+
+  NASDAQ   HIGH_VOLATILITY        volatility        1.506 VOL_ATR_Expand      
+  NASDAQ   LOW_VOLATILITY         trend_follow      1.205 TF_Breakout_20      
+  NASDAQ   MEAN_REVERTING         trend_follow      1.172 MR_RSI_Exhaust      
+  NASDAQ   TRENDING               trend_follow      0.992 TF_Momentum         
+
+  PETR4    HIGH_VOLATILITY        trend_follow      1.160 TF_Momentum         
+  PETR4    MEAN_REVERTING         mean_reversion    0.132 MR_RSI_Exhaust      
+  PETR4    TRENDING               trend_follow      1.054 TF_EMA_Slope        
+
+  QQQ      HIGH_VOLATILITY        mean_reversion    1.804 MR_RSI_Exhaust      
+  QQQ      MEAN_REVERTING         mean_reversion    0.410 MR_EMA_Dist         
+  QQQ      TRENDING               trend_follow      1.360 TF_Momentum         
+
+  SPY      HIGH_VOLATILITY        volatility        2.804 VOL_Range_Bkout     
+  SPY      TRENDING               mean_reversion    1.242 MR_RSI_Exhaust      
+
+========================================================================
+  SUMMARY: HIPOTESES COM ESTABILIDADE ESTRUTURAL
+========================================================================
+  TF_Breakout_20: stability=0.774 | best_in=TRENDING (PF avg 0.942) | fragile_in=LOW_VOLATILITY
+  MR_EMA_Dist: stability=0.681 | best_in=MEAN_REVERTING (PF avg 1.063) | fragile_in=MEAN_REVERTING
+  MR_BB_Stretch: stability=0.668 | best_in=MEAN_REVERTING (PF avg 1.144) | fragile_in=MEAN_REVERTING
+========================================================================

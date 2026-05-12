@@ -108,6 +108,73 @@
 > Tom atual: DOVISH | Selic 14.40% aa | Ações BR: impacto positivo
 > Atualizar: `.\venv\Scripts\python.exe scripts\ingest_copom.py --force`
 
+---
+
+## Fractal Lab — Laboratório Quantitativo (research/)
+
+### ✅ Fractal Lab Core Engine MVP (2026-05-11)
+- [x] **Orchestrator** — `research/fractal_lab/core/orchestrator.py` · interface: `run_hypothesis(df, hypothesis) → ResearchReport`
+- [x] **Pipeline** — features → regimes → backtest → walk-forward → Monte Carlo → robustness
+- [x] **Feature Engine** — `base_features.py` · ATR, EMA20/50/200, slope, volatility, RSI, BB, momentum
+- [x] **4 regimes** — `regime_detector.py` · TRENDING | MEAN_REVERTING | HIGH_VOLATILITY | LOW_VOLATILITY
+- [x] **Backtest Engine** — candle-by-candle, sem look-ahead, signal t-1 / entrada t
+- [x] **Walk-Forward** — janela expansiva, N folds temporais, sem random split
+- [x] **Monte Carlo** — bootstrap de trades, distribuição de equity curve (1.000 simulações)
+- [x] **Robustness Score** — 0–1: consistência × estabilidade × MC × DD risk
+- [x] **SQLite Storage** — `data/fractal_lab.db`, queries por hipótese e timestamp
+- [x] **12 entry types** — mean_reversion, trend_follow, breakout, oscillator_extremes, ema_slope, momentum_atr, volatility_breakout, range_breakout, e mais
+
+### ✅ Batch Runner — Stress Test Multi-Asset (2026-05-12)
+- [x] **10 ativos** — EURUSD, Gold, NASDAQ, ITUB4, PETR4, IBOV, SPY, QQQ, BTC, DXY
+- [x] **8 hipóteses** — 3 grupos: Mean Reversion (3) + Trend Following (3) + Volatility (2)
+- [x] **80 combinações** rodadas com train/test/OOS separados deterministicamente
+- [x] **Output por run** — `results_matrix.csv`, `results_full.json`, `ranking.csv`, `heatmap_ascii.txt`
+- [x] **CLI flexível** — `--assets`, `--hypotheses`, `--dry-run`
+
+**Resultados chave (80 combinações):**
+- 39/80 passaram OOS (PASS ou OOS_PASS)
+- Robustez máxima: BTC×MR_RSI_Exhaust (0.890), GOLD×TF_Momentum (0.870), EURUSD×MR_RSI_Exhaust (0.828)
+- MR_RSI_Exhaust e MR_EMA_Dist: sobrevivem em 7+ ativos diferentes
+
+### ✅ Regime Analytics + Failure Clusters (2026-05-12)
+- [x] **RegimeAnalytics** — `analytics/regime_analytics.py` · per-regime PF/Sharpe/N, stability ranking, behavioral market map, OOS degradation by regime
+- [x] **FailureClusterer** — `analytics/failure_clusters.py` · KMeans (k automático) + DBSCAN outliers, auto-naming de clusters, structural insights
+- [x] **Output** — `research/results/regime_analytics/` · per_regime_metrics.csv, stability_ranking.csv, behavioral_market_map.csv, cluster_assignments.csv
+
+**Behavioral Market Map emergente (10 ativos × 4 regimes):**
+
+| Asset | TRENDING | MEAN_REVERTING | HIGH_VOL | LOW_VOL |
+|-------|---------|----------------|----------|---------|
+| EURUSD | MR (RSI) | MR (BB) | MR (RSI) | MR (RSI) |
+| DXY | MR (BB) | MR (BB) | MR (Range) | MR (EMA) |
+| BTC | MR (RSI) | TF (Slope) | MR (RSI) | MR (Slope) |
+| GOLD | TF (Mom) | TF (Mom★) | MR (Brk) | MR (BB) |
+| NASDAQ | TF (Mom) | TF (RSI) | VOL (ATR) | TF (Brk) |
+| SPY | MR (RSI) | — | VOL (Range) | — |
+| QQQ | TF (Mom) | MR (EMA) | MR (RSI) | — |
+| ITUB4 | TF (Mom) | MR (RSI) | MR (RSI) | — |
+| PETR4 | TF (Slope) | — | TF (Mom) | — |
+| IBOV | TF (Brk) | — | MR (RSI) | — |
+
+★ GOLD MEAN_REVERTING: TF_Momentum PF 2.635 — exceção notável
+
+**Stability Ranking (consistência de PF cross-regime, não maior PF):**
+1. TF_Breakout_20: 0.774 — estável mas PF médio 0.94 (edge fraco)
+2. MR_EMA_Dist: 0.681 — melhor equilíbrio estabilidade × edge
+3. MR_BB_Stretch: 0.669 — consistente, edge positivo
+4. MR_RSI_Exhaust: 0.662 — alta robustez absoluta, menor estabilidade cross-regime
+
+**Clusters de Falha identificados (41 falhas):**
+- **DATA_MINING_OVERFIT** (8): test PF bom, OOS colapsou −35.8% — não confiar em PF test isolado
+- **STRUCTURAL_FAILURE** (27): hipótese incompatível com o ativo — rejeitar
+- **VOLATILITY_TRAP** (6): execução em HIGH_VOL com spread real eliminaria o edge
+- **DBSCAN outliers** (9): VOL_ATR_Expand em maioria — poucos trades, estatisticamente inválido
+
+**Regime mais perigoso para degradação OOS:** MEAN_REVERTING (até −71% em alguns casos)
+**Regime mais estável:** TRENDING (menor variância test→OOS)
+
+---
+
 ### 🚀 Fase 5 — Paper Trading e Validação (iniciada 2026-05-05)
 - [x] **Paper trading implementado** — `core/paper_trading.py` com SQLite WAL
 - [x] **Carteira virtual R$ 10.000** — posição 10% do capital por trade

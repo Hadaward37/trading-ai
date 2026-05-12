@@ -1,0 +1,59 @@
+========================================================================
+  FAILURE CLUSTER ANALYSIS
+  Generated: 2026-05-12T00:49:27.054055
+  Total failures analyzed: 41
+  KMeans clusters: 3
+  DBSCAN outliers (anomalous failures): 9
+========================================================================
+
+  CLUSTER 0 -- DATA_MINING_OVERFIT
+  Cases: 8
+  Assets:      IBOV(2); EURUSD(1); ITUB4(1)
+  Hypotheses:  VOL_ATR_Expand(3); MR_BB_Stretch(1); MR_EMA_Dist(1)
+  Groups:      volatility(3); mean_reversion(3)
+  Verdicts:    DEGRADED(8)
+  Feature centroid:
+    robustness=0.463  test_pf=1.303  oos_pf=0.768
+    pf_degradation=-0.358  test_sharpe=0.105
+    pct_trending=33.1%  pct_high_vol=61.9%  pct_mean_rev=3.3%
+
+  CLUSTER 1 -- STRUCTURAL_FAILURE
+  Cases: 27
+  Assets:      NASDAQ(4); ITUB4(4); PETR4(4)
+  Hypotheses:  TF_Breakout_20(7); TF_EMA_Slope(6); TF_Momentum(4)
+  Groups:      trend_follow(17); mean_reversion(10)
+  Verdicts:    FAIL(25); DEGRADED(2)
+  Feature centroid:
+    robustness=0.253  test_pf=0.907  oos_pf=1.004
+    pf_degradation=+0.116  test_sharpe=-0.044
+    pct_trending=53.2%  pct_high_vol=36.9%  pct_mean_rev=4.7%
+
+  CLUSTER 2 -- VOLATILITY_TRAP
+  Cases: 6
+  Assets:      EURUSD(1); GOLD(1); PETR4(1)
+  Hypotheses:  VOL_Range_Bkout(3); VOL_ATR_Expand(3)
+  Groups:      volatility(6)
+  Verdicts:    FAIL(6)
+  Feature centroid:
+    robustness=0.230  test_pf=0.426  oos_pf=1.442
+    pf_degradation=+0.704  test_sharpe=-0.778
+    pct_trending=0.0%  pct_high_vol=68.5%  pct_mean_rev=0.0%
+
+  DBSCAN OUTLIERS (anomalous, isolated failures) -- 9 cases
+    EURUSD   x VOL_ATR_Expand       [DEGRADED]
+    EURUSD   x VOL_Range_Bkout      [FAIL]
+    GOLD     x VOL_Range_Bkout      [FAIL]
+    ITUB4    x VOL_ATR_Expand       [DEGRADED]
+    PETR4    x VOL_Range_Bkout      [FAIL]
+    IBOV     x VOL_ATR_Expand       [FAIL]
+    SPY      x VOL_ATR_Expand       [FAIL]
+    QQQ      x VOL_ATR_Expand       [FAIL]
+    DXY      x VOL_ATR_Expand       [DEGRADED]
+
+========================================================================
+  STRUCTURAL INSIGHTS
+========================================================================
+  [DATA_MINING_OVERFIT] 8 cases: estrategia parece boa no test mas colapsa no OOS (deg=-35.8%). Provavelmente overfitting de parametros ao periodo de treino. Nao confiar em PF test isolado.
+  [STRUCTURAL_FAILURE] 27 cases: falha estrutural -- nenhuma feature individualmente explica. Hipotese pode ser incompativel com o asset. Rejeitar sem revisao.
+  [VOLATILITY_TRAP] 6 cases: execucao concentrada em periodos de alta volatilidade onde spread/slippage real eliminaria o edge. Avaliar com custo de transacao explicito.
+========================================================================
