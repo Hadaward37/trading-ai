@@ -1,0 +1,34 @@
+========================================================================
+  EDGE DECAY ANALYSIS
+  Generated: 2026-05-12T01:17:33.761123
+  Combinations: 12
+========================================================================
+
+  Combination                        N  Base PF  Final PF   Decay% Type                     HL-30
+  ------------------------------------------------------------------------------------------------
+  NASDAQ_VOL_ATR_Expand            153    1.693     0.964   -43.0% DECAY                       98
+  ITUB4_MR_RSI_Exhaust             377    1.329     0.855   -35.7% DECAY                       69
+  DXY_MR_EMA_Dist                 1442    1.310     1.042   -20.5% STABLE                     208
+  DXY_MR_RSI_Exhaust              1068    1.140     1.032    -9.5% STABLE                      85
+  BTC_MR_EMA_Dist                 2093    1.134     1.113    -1.9% STABLE                     205
+  PETR4_TF_EMA_Slope               344    1.246     1.264    +1.5% STABLE                     110
+  GOLD_TF_Momentum                1027    1.019     1.070    +5.0% STABLE                      22
+  GOLD_TF_EMA_Slope                985    1.007     1.132   +12.4% STABLE                     679
+  BTC_MR_RSI_Exhaust              1412    0.970     1.159   +19.5% STABLE                     260
+  EURUSD_MR_EMA_Dist              1667    1.143     1.385   +21.1% STABLE                     169
+  EURUSD_MR_RSI_Exhaust            904    1.141     1.411   +23.7% STABLE                      75
+  SPY_MR_BB_Stretch                390    0.985     1.301   +32.1% STABLE                     inf
+
+  DECAY TYPE DISTRIBUTION:
+    STABLE                  10  [================    ]  83.3%
+    IMPROVING                0  [                    ]   0.0%
+    DECAY                    2  [===                 ]  16.7%
+    SATURATION               0  [                    ]   0.0%
+    STRUCTURAL_BREAK         0  [                    ]   0.0%
+
+  WARNING: The following combinations show edge decay:
+
+    NASDAQ_VOL_ATR_Expand: DECAY | HL=98 trades | decay=-43.0%
+    ITUB4_MR_RSI_Exhaust: DECAY | HL=69 trades | decay=-35.7%
+
+========================================================================

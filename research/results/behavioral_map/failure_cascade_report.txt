@@ -1,0 +1,38 @@
+========================================================================
+  FAILURE CASCADE ANALYSIS
+  Generated: 2026-05-12T01:17:50.512613
+  Combinations: 12
+========================================================================
+
+  Combination                        N  Casc  AvgDep  MaxDep     AvgDD   Recov  Unrecov%  Trigger
+  ----------------------------------------------------------------------------------------------------
+  ITUB4_MR_RSI_Exhaust             377    48     4.6      13     -98.9    10.3     22.9%      N=1
+  DXY_MR_RSI_Exhaust              1068   154     3.9      13    -432.0    19.3      1.3%      N=1
+  DXY_MR_EMA_Dist                 1442   208     3.9      14    -418.3    30.0      1.9%      N=2
+  BTC_MR_EMA_Dist                 2093   309     3.8      12   -1921.9    23.2      0.0%     none
+  NASDAQ_VOL_ATR_Expand            153    20     3.8      11    -375.2     4.7     10.0%      N=5
+  EURUSD_MR_EMA_Dist              1667   234     3.7      16     -11.5    17.7      0.4%      N=7
+  EURUSD_MR_RSI_Exhaust            904   130     3.7      14     -11.5    16.2      0.8%     none
+  SPY_MR_BB_Stretch                390    58     3.7      12    -851.7     8.4      3.4%      N=5
+  GOLD_TF_EMA_Slope                985   133     3.6      10    -795.6    23.5      4.5%     none
+  BTC_MR_RSI_Exhaust              1412   223     3.6      10   -1823.0    23.1      1.8%     none
+  GOLD_TF_Momentum                1027   139     3.5      13    -775.7    21.2      4.3%      N=6
+  PETR4_TF_EMA_Slope               344    45     3.4      11    -137.5    10.3      4.4%      N=6
+
+  CONDITIONAL LOSS PROBABILITY  P(loss | N consecutive losses)
+  (> 0.65 = elevated risk, recommended throttle point)
+
+  N       Mean P(loss)      Min      Max  Heat
+  ------------------------------------------------------------
+  1             0.6259   0.5425   0.6952  >>>>>>>>>>>>        
+  2             0.6358   0.5826   0.7270  >>>>>>>>>>>>        
+  3             0.6139   0.5234   0.7024  >>>>>>>>>>>>        
+  4             0.6142   0.5441   0.6989  >>>>>>>>>>>>        
+  5             0.6224   0.5521   0.7308  >>>>>>>>>>>>        
+  6             0.6337   0.5000   0.7500  >>>>>>>>>>>>        
+  7             0.6108   0.4306   0.6875  >>>>>>>>>>>>        
+
+  No elevated conditional loss probability detected.
+  Losses appear independent — cascade risk is low.
+
+========================================================================

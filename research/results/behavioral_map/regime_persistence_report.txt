@@ -1,0 +1,40 @@
+========================================================================
+  REGIME PERSISTENCE ANALYSIS
+  Generated: 2026-05-12T01:17:49.397056
+========================================================================
+
+  REGIME DURATION STATS (aggregate across assets, 1H bars)
+
+  Regime                    Mean   Median     P95     Max   Blocks    ~Days
+  ----------------------------------------------------------------------
+  TRENDING                   8.4      5.0    26.7    59.6      568     0.35
+  MEAN_REVERTING             5.4      4.1    14.0    26.4      116     0.22
+  HIGH_VOLATILITY            6.7      3.8    20.7    44.8      515     0.28
+  LOW_VOLATILITY             4.0      2.9    10.4    15.9      202     0.17
+
+  MARKOV TRANSITION MATRIX P[TO | FROM] (aggregate)
+
+  FROM \ TO                   TRENDING  MEAN_REVERTI  HIGH_VOLATIL  LOW_VOLATILI
+  ------------------------------------------------------------------------------
+  TRENDING                       0.000         0.093         0.696         0.211
+  MEAN_REVERTING                 0.488         0.000         0.389         0.123
+  HIGH_VOLATILITY                0.770         0.102         0.000         0.128
+  LOW_VOLATILITY                 0.575         0.066         0.359         0.000
+
+  STEADY-STATE DISTRIBUTION (long-run regime probability)
+
+  TRENDING                0.406  [================                        ]
+  MEAN_REVERTING          0.084  [===                                     ]
+  HIGH_VOLATILITY         0.367  [==============                          ]
+  LOW_VOLATILITY          0.143  [=====                                   ]
+
+  DURATION -> PF CORRELATION (does regime duration affect edge?)
+
+  Regime                 n_assets   Mean r Interpretation
+  ----------------------------------------------------------------------
+  TRENDING                      7    0.055  NO_DURATION_EFFECT
+  MEAN_REVERTING                1    0.330  LONGER_DURATION_BETTER_PF
+  HIGH_VOLATILITY               5   -0.001  NO_DURATION_EFFECT
+  LOW_VOLATILITY                2    0.262  LONGER_DURATION_BETTER_PF
+
+========================================================================

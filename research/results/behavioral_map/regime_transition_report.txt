@@ -1,0 +1,57 @@
+========================================================================
+  REGIME TRANSITION ANALYSIS
+  Generated: 2026-05-12T01:17:31.528050
+  Combinations analyzed: 12
+========================================================================
+
+  AGGREGATE TRANSITION PROBABILITY MATRIX (P[TO | FROM])
+
+  FROM \ TO                   TRENDING  MEAN_REVERTI  HIGH_VOLATIL  LOW_VOLATILI
+  ------------------------------------------------------------------------------
+  TRENDING                       0.000         0.091         0.702         0.207
+  MEAN_REVERTING                 0.410         0.000         0.419         0.171
+  HIGH_VOLATILITY                0.774         0.096         0.000         0.130
+  LOW_VOLATILITY                 0.578         0.091         0.331         0.000
+
+  TOP DEGRADING TRANSITIONS (delta_pf most negative)
+
+  FROM                   TO                         N   PF_pre  PF_post    Delta  Degrades
+  --------------------------------------------------------------------------------------
+  LOW_VOLATILITY         HIGH_VOLATILITY           74    4.739    0.520  -4.2185  YES
+  MEAN_REVERTING         HIGH_VOLATILITY           45    4.260    0.720  -3.5395  YES
+  LOW_VOLATILITY         HIGH_VOLATILITY           74    2.999    0.660  -2.3391  YES
+  MEAN_REVERTING         HIGH_VOLATILITY           45    2.776    0.831  -1.9450  YES
+  LOW_VOLATILITY         MEAN_REVERTING            12    2.379    0.565  -1.8140  YES
+  LOW_VOLATILITY         TRENDING                 122    3.030    1.754  -1.2761  YES
+  HIGH_VOLATILITY        MEAN_REVERTING           130    2.401    1.144  -1.2563  YES
+  HIGH_VOLATILITY        LOW_VOLATILITY           168    1.886    0.668  -1.2180  YES
+  HIGH_VOLATILITY        MEAN_REVERTING           130    1.964    1.037  -0.9272  YES
+  TRENDING               LOW_VOLATILITY           165    1.952    1.083  -0.8684  YES
+
+  TRANSITION ZONE vs STABLE ZONE — PER COMBINATION
+
+  Combination                      PF_trans  PF_stable Verdict                  
+  --------------------------------------------------------------------------------
+  BTC_MR_RSI_Exhaust                  1.061      1.449 DIE_AT_TRANSITIONS       
+  PETR4_TF_EMA_Slope                  1.181      1.352 TRANSITION_RESILIENT     
+  GOLD_TF_Momentum                    1.066      1.215 TRANSITION_RESILIENT     
+  BTC_MR_EMA_Dist                     1.140      1.247 TRANSITION_RESILIENT     
+  SPY_MR_BB_Stretch                   1.198      1.192 TRANSITION_RESILIENT     
+  DXY_MR_EMA_Dist                     1.118      1.103 TRANSITION_RESILIENT     
+  EURUSD_MR_EMA_Dist                  1.257      1.168 TRANSITION_RESILIENT     
+  GOLD_TF_EMA_Slope                   1.167      1.048 TRANSITION_RESILIENT     
+  ITUB4_MR_RSI_Exhaust                1.024      0.905 DIE_WITHIN_REGIMES       
+  EURUSD_MR_RSI_Exhaust               1.328      1.119 TRANSITION_RESILIENT     
+  DXY_MR_RSI_Exhaust                  1.191      1.002 TRANSITION_RESILIENT     
+  NASDAQ_VOL_ATR_Expand               2.192      0.652 DIE_WITHIN_REGIMES       
+
+========================================================================
+  RESPOSTA: sistemas morrem na transicao ou dentro do regime?
+========================================================================
+  DIE_AT_TRANSITIONS:  1 combinacoes
+  DIE_WITHIN_REGIMES:  2 combinacoes
+  TRANSITION_RESILIENT: 9 combinacoes
+
+  => CONCLUSAO: estrategias morrem DENTRO dos regimes (edge sistematicamente fraco).
+     Selecao de regime mais rigorosa e necessaria antes de entrar.
+========================================================================
