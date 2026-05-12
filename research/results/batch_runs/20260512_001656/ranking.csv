@@ -1,0 +1,4 @@
+hypothesis,group,avg_robustness,avg_pf_test,avg_pf_oos,avg_sharpe,n_pass,n_assets
+MR_BB_Stretch,mean_reversion,0.0000,0.0000,0.0000,0.0000,0,1
+TF_Breakout_20,trend_follow,0.0000,0.0000,0.0000,0.0000,0,1
+VOL_ATR_Expand,volatility,0.0000,0.0000,0.0000,0.0000,0,1

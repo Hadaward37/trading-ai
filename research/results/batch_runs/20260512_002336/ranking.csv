@@ -1,0 +1,6 @@
+hypothesis,group,avg_robustness,avg_pf_test,avg_pf_oos,avg_sharpe,n_pass,n_assets
+VOL_ATR_Expand,volatility,0.3236,1.9420,0.0000,0.2880,0,1
+TF_Breakout_20,trend_follow,0.2995,0.8680,1.0060,-0.0660,0,1
+TF_EMA_Slope,trend_follow,0.2825,0.9860,0.9430,-0.0060,0,1
+MR_EMA_Dist,mean_reversion,0.2669,0.9430,1.1140,-0.0270,0,1
+MR_BB_Stretch,mean_reversion,0.2537,0.8700,0.9850,-0.0640,0,1
