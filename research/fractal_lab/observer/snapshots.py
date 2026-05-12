@@ -217,6 +217,15 @@ class TelegramAlerter:
         except Exception:
             return False
 
+    def _send_raw(self, text: str) -> bool:
+        """Send a raw Markdown text to Telegram (no formatting wrapper)."""
+        if not self.is_enabled:
+            return False
+        try:
+            return self._notifier.send_text(text)
+        except Exception:
+            return False
+
     @staticmethod
     def _format(event: Event, emoji: str) -> str:
         hyp  = f"\n*Hipotese:* `{event.hypothesis}`" if event.hypothesis else ""

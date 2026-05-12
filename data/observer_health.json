@@ -1,0 +1,40 @@
+{
+  "health_score": 83,
+  "label": "GOOD",
+  "description": "Pequenas anomalias, edge mantido",
+  "components": {
+    "regime_risk": -3,
+    "structural_warnings": -2,
+    "robustness": 0,
+    "rolling_pf": -9,
+    "cascade_state": -4
+  },
+  "component_notes": {
+    "regime_risk": [
+      "Regime: LOW_VOLATILITY (-8 pts)",
+      "Regime: TRENDING (+0 pts)",
+      "Regime: TRENDING (+0 pts)"
+    ],
+    "structural_warnings": [
+      "Alertas estruturais: 0 (INFO)",
+      "Alertas estruturais: 0 (INFO)",
+      "Alertas estruturais: 1 (WARNING)"
+    ],
+    "robustness": [
+      "Robustness proxy: 0.925",
+      "PF consistente entre janelas",
+      "Robustness proxy: 0.953"
+    ],
+    "rolling_pf": [
+      "Avg rolling PF ratio: 109.51% (baseline=1.372)",
+      "Edge acima do baseline",
+      "Avg rolling PF ratio: 84.18% (baseline=1.274)"
+    ],
+    "cascade_state": [
+      "Cascata atual: 4 losses consecutivos",
+      "Cascata moderada",
+      "Cascata atual: 0 losses consecutivos"
+    ]
+  },
+  "timestamp": "2026-05-12T02:35:46.080458+00:00"
+}

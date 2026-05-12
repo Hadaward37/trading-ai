@@ -63,6 +63,10 @@ from .baselines import (
     HYPOTHESIS_BASELINES, HYPOTHESIS_GROUPS,
     get_baseline, get_hypothesis_group, next_regime_probs,
 )
+from .alert_throttle import AlertThrottle, AlertAggregator
+from .health_score   import (
+    HealthScore, compute_health_score, compute_aggregate_health, save_health_score
+)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -199,6 +203,18 @@ class ObserverAgent:
         self._telegram  = TelegramAlerter()
         self._snap_on_critical = snapshot_on_critical
 
+        # Alert fatigue control
+        self._throttle   = AlertThrottle()
+        self._aggregator = AlertAggregator()
+
+        # Health scores (latest per combination + aggregate)
+        self._health_scores: Dict[str, HealthScore] = {}
+        self._aggregate_health: Optional[HealthScore] = None
+
+        # 6H summary tracking
+        self._last_summary_ts: float = 0.0
+        self._summary_interval = 6 * 3600   # 6 hours
+
         # Internal state
         self._state: Dict[str, Any] = {
             "started_at":   datetime.now(timezone.utc).isoformat(),
@@ -206,12 +222,14 @@ class ObserverAgent:
             "n_events":     0,
             "n_criticals":  0,
             "n_warnings":   0,
+            "n_suppressed": 0,
             "last_cycle":   None,
+            "health_score": None,
             "assets":       {},
         }
         self._risk_contexts: Dict[str, Dict] = {}
 
-        # Subscribe handlers
+        # Subscribe handlers — throttle wrapper
         self.bus.subscribe(self._on_event)
 
     # ── Public API ─────────────────────────────────────────────────────────────
@@ -254,21 +272,68 @@ class ObserverAgent:
         self._state["assets"]       = cycle_state["combinations"]
         self._state["n_events"]     = len(self.bus.recent())
 
-        # Periodic snapshot
+        # ── Compute health scores ──────────────────────────────────────────────
+        combo_scores = []
+        for combo_key, combo_state in cycle_state["combinations"].items():
+            ctx      = combo_state.get("risk_context", {})
+            edge     = combo_state.get("edge_health", {})
+            degrad   = combo_state.get("degradation", {})
+            cascade  = combo_state.get("cascade", {})
+            regime   = combo_state.get("regime", {})
+            baseline = get_baseline(
+                combo_state.get("asset", ""),
+                combo_state.get("hypothesis") or "",
+            )
+
+            hs = compute_health_score(
+                current_regime     = ctx.get("current_regime", "TRENDING"),
+                recent_transition  = tuple(ctx["recent_transition"]) if ctx.get("recent_transition") else None,
+                rolling            = edge.get("rolling", {}),
+                baseline_pf        = baseline.get("pf", 1.10),
+                robustness_proxy   = degrad.get("robustness_proxy"),
+                cascade_streak     = cascade.get("current_streak", 0),
+                structural_notes   = ctx.get("structural_notes", []),
+                severity           = ctx.get("severity", "INFO"),
+            )
+            self._health_scores[combo_key] = hs
+            combo_scores.append(hs)
+
+        self._aggregate_health = compute_aggregate_health(combo_scores)
+        save_health_score(self._aggregate_health)
+        self._state["health_score"] = self._aggregate_health.score
+
+        # ── Flush aggregated alerts to Telegram ────────────────────────────────
+        if self._aggregator.has_pending():
+            for msg in self._aggregator.flush():
+                self._telegram._send_raw(msg)
+
+        # ── Periodic snapshot ──────────────────────────────────────────────────
         snap_path = self._snapshots.save(
-            state=self._state,
+            state={
+                **self._state,
+                "health": self._aggregate_health.to_dict() if self._aggregate_health else {},
+                "throttle": self._throttle.stats(),
+            },
             recent_events=[e.to_dict() for e in self.bus.recent(30)],
             trigger="periodic",
         )
 
-        # Publish risk context for Sistema 1 to read
+        # ── Publish risk context for Sistema 1 (read-only) ────────────────────
         self._snapshots.save_context(self._risk_contexts)
 
+        # ── 6H summary ────────────────────────────────────────────────────────
+        if (time.monotonic() - self._last_summary_ts) >= self._summary_interval:
+            self._send_6h_summary()
+            self._last_summary_ts = time.monotonic()
+
         print(
-            f"[Observer] Cycle #{self._state['n_cycles']} complete. "
-            f"Criticals: {self._state['n_criticals']} | "
-            f"Warnings: {self._state['n_warnings']} | "
-            f"Snapshot: {snap_path.name}"
+            f"[Observer] Cycle #{self._state['n_cycles']} | "
+            f"Health={self._aggregate_health.score if self._aggregate_health else '?'}/100 "
+            f"({self._aggregate_health.label if self._aggregate_health else '?'}) | "
+            f"Criticals={self._state['n_criticals']} "
+            f"Warnings={self._state['n_warnings']} "
+            f"Suppressed={self._state['n_suppressed']} | "
+            f"Snap={snap_path.name}"
         )
 
         return cycle_state
@@ -400,33 +465,133 @@ class ObserverAgent:
 
     def _on_event(self, event: Event) -> None:
         """
-        Master event handler. Called for every event published to the bus.
+        Master event handler with Alert Fatigue Control.
 
-        Actions (all read-only outputs):
-          1. Log to file
-          2. Send Telegram alert (WARNING/CRITICAL only)
-          3. Save CRITICAL snapshot immediately
-          4. Update agent state counters
+        Pipeline:
+          1. Log ALL events to file (no suppression)
+          2. Throttle check — suppress duplicates within cooldown window
+          3. If passes throttle → add to aggregator batch
+          4. Immediate snapshot on CRITICAL (bypasses batching)
+          5. Update state counters
         """
-        # Log all events
+        # Log all events without filtering
         self._logger.log(event)
 
-        # Count by severity
+        # Throttle check
+        current_pf = None
+        should_send, reason = self._throttle.should_send(event, current_pf)
+
+        if not should_send:
+            self._state["n_suppressed"] = self._state.get("n_suppressed", 0) + 1
+            return
+
+        # Count by severity (only non-suppressed)
         if event.severity == Severity.CRITICAL:
             self._state["n_criticals"] += 1
         elif event.severity == Severity.WARNING:
             self._state["n_warnings"]  += 1
 
-        # Telegram push for WARNING/CRITICAL
-        self._telegram.alert(event)
+        # Add to aggregator batch (sent at end of cycle)
+        self._aggregator.add(event)
 
-        # Immediate snapshot on CRITICAL events
-        if event.is_critical and self._snap_on_critical:
-            self._snapshots.save(
-                state=self._state,
-                recent_events=[e.to_dict() for e in self.bus.recent(50)],
-                trigger=f"CRITICAL_{event.event_type.value}",
-            )
+        # Immediate CRITICAL snapshot + direct Telegram (bypass aggregation)
+        if event.is_critical:
+            if self._snap_on_critical:
+                self._snapshots.save(
+                    state=self._state,
+                    recent_events=[e.to_dict() for e in self.bus.recent(50)],
+                    trigger=f"CRITICAL_{event.event_type.value}",
+                )
+            # Send CRITICAL immediately, don't wait for batch
+            self._telegram.alert(event)
+
+    # ── 6H Summary ────────────────────────────────────────────────────────────
+
+    def get_health_summary(self) -> str:
+        """
+        Format the 6H observer summary for Telegram.
+        Called every 6H from run_once() and from the scheduler integration.
+        """
+        ts = datetime.now(timezone.utc).strftime("%H:%M UTC")
+        agg = self._aggregate_health
+        if agg is None:
+            return f"📊 *Observer Summary — {ts}*\n_Nenhum dado disponivel ainda._"
+
+        label_emoji = {
+            "EXCELLENT": "💚", "GOOD": "🟢",
+            "MODERATE": "🟡", "POOR": "🔴", "CRITICAL": "🚨",
+        }
+        emoji  = label_emoji.get(agg.label, "📊")
+        bar_n  = int(agg.score / 10)
+        bar    = "█" * bar_n + "░" * (10 - bar_n)
+
+        lines = [
+            f"📊 *OBSERVER SUMMARY — {ts}*",
+            "",
+            f"{emoji} *Saude do Sistema: {agg.score}/100 ({agg.label})*",
+            f"`[{bar}]`",
+            f"_{agg.description}_",
+            "",
+        ]
+
+        # Components breakdown
+        if agg.components:
+            lines.append("*Componentes:*")
+            names = {
+                "regime_risk": "Regime",
+                "rolling_pf": "Rolling PF",
+                "robustness": "Robustness",
+                "cascade_state": "Cascade",
+                "structural_warnings": "Structural",
+            }
+            for k, pts in agg.components.items():
+                sign = f"{'+' if pts >= 0 else ''}{pts}"
+                lines.append(f"  • {names.get(k, k)}: `{sign} pts`")
+            lines.append("")
+
+        # Top risks (worst combinations)
+        worst = sorted(self._health_scores.items(), key=lambda x: x[1].score)[:3]
+        if worst:
+            lines.append("*Ativos mais degradados:*")
+            for key, hs in worst:
+                lines.append(f"  🔴 {key}: {hs.score}/100 ({hs.label})")
+            lines.append("")
+
+        # Healthiest edge
+        best = sorted(self._health_scores.items(), key=lambda x: -x[1].score)[:2]
+        if best:
+            lines.append("*Edge mais saudavel:*")
+            for key, hs in best:
+                lines.append(f"  💚 {key}: {hs.score}/100")
+            lines.append("")
+
+        # Regime dominance
+        regimes: Dict[str, int] = {}
+        for ctx in self._risk_contexts.values():
+            r = ctx.get("current_regime", "?")
+            regimes[r] = regimes.get(r, 0) + 1
+        if regimes:
+            lines.append("*Regimes dominantes:*")
+            for r, cnt in sorted(regimes.items(), key=lambda x: -x[1]):
+                lines.append(f"  • {r}: {cnt}/{len(self._risk_contexts)} ativos")
+            lines.append("")
+
+        # Alert stats
+        lines.append(
+            f"*Alertas (session):* {self._state.get('n_criticals', 0)} CRITICAL | "
+            f"{self._state.get('n_warnings', 0)} WARNING | "
+            f"{self._state.get('n_suppressed', 0)} suprimidos"
+        )
+
+        return "\n".join(lines)
+
+    def _send_6h_summary(self) -> None:
+        """Send 6H summary to Telegram (fire-and-forget, no errors propagated)."""
+        try:
+            summary = self.get_health_summary()
+            self._telegram._send_raw(summary)  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
     # ── Query API ──────────────────────────────────────────────────────────────
 

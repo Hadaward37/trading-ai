@@ -4,6 +4,11 @@ only when the signal changes (BUY <-> SELL / HOLD -> BUY|SELL).
 Spam prevention: HOLD signals and repeated identical signals are suppressed.
 News filter: high-impact economic events block signal alerts with a warning.
 Multi-asset: monitors EUR/USD, VALE3, PETR4, ITUB4, BBDC4, IBOV simultaneously.
+
+Observer integration (non-blocking):
+  The Fractal Lab Observer runs every 1H alongside Sistema 1.
+  REGRA: observer APENAS observa, registra e alerta.
+  Nunca bloqueia sinais, nunca altera parametros, nunca interfere na execucao.
 """
 
 from __future__ import annotations
@@ -34,6 +39,20 @@ from db.database import save_ohlcv, save_signals
 logger = logging.getLogger(__name__)
 
 _SIGNAL_NAMES = {1: "BUY", -1: "SELL", 0: "HOLD"}
+
+# ── Observer Agent (optional, non-blocking) ───────────────────────────────────
+# Loaded once at module level. Import errors are silently ignored — Sistema 1
+# continues normally without the observer.
+
+_OBSERVER_AVAILABLE = False
+try:
+    from research.fractal_lab.observer.agent import ObserverAgent as _ObserverAgent
+    _OBSERVER_AVAILABLE = True
+except Exception:
+    pass
+
+OBSERVER_INTERVAL_S = 3600          # observer runs every 1H
+SUMMARY_INTERVAL_S  = 6 * 3600     # 6H Telegram summary
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -342,12 +361,50 @@ def run_scheduler() -> None:
         config.PAPER_TRADING_ENABLED,
     )
 
+    # ── Observer Agent initialization (non-blocking) ──────────────────────────
+    _observer = None
+    _last_observer_ts: float = 0.0
+    _observer_cycle:   int   = 0
+
+    if _OBSERVER_AVAILABLE:
+        try:
+            _observer = _ObserverAgent()
+            logger.info(
+                "[Observer] Initialized | interval=1H | targets=%d | alert_fatigue=ON",
+                len(_observer.targets),
+            )
+            notifier.send_text(
+                "🔬 *Fractal Lab Observer* iniciado\n"
+                "Monitoramento cientifico ativo (read-only)\n"
+                "Alertas: WARNING a cada 4H | CRITICAL a cada 2H\n"
+                "Health summary: a cada 6H"
+            )
+        except Exception as exc:
+            logger.warning("[Observer] Could not initialize: %s — continuing without observer", exc)
+
     last_signals: dict[str, Optional[int]] = {}
     _last_journal_date: Optional[str] = None
 
     while True:
         try:
             last_signals = run_once(notifier, last_signals, portfolio)
+
+            # ── Observer cycle (every 1H, non-blocking) ───────────────────────
+            if _observer is not None:
+                now_mono = time.monotonic()
+                if (now_mono - _last_observer_ts) >= OBSERVER_INTERVAL_S:
+                    try:
+                        _observer.run_once()
+                        _observer_cycle += 1
+                        _last_observer_ts = now_mono
+                        logger.info(
+                            "[Observer] Cycle #%d complete | Health=%s/100 (%s)",
+                            _observer_cycle,
+                            _observer._aggregate_health.score if _observer._aggregate_health else "?",
+                            _observer._aggregate_health.label  if _observer._aggregate_health else "?",
+                        )
+                    except Exception as exc:
+                        logger.warning("[Observer] Cycle error (non-fatal): %s", exc)
 
             # Export journal CSV uma vez por dia (à meia-noite UTC)
             today = datetime.now().strftime("%Y-%m-%d")
@@ -361,6 +418,13 @@ def run_scheduler() -> None:
             if portfolio:
                 print_daily_summary()
                 export_daily_csv()
+            if _observer:
+                # Send final summary before exiting
+                try:
+                    summary = _observer.get_health_summary()
+                    notifier.send_text(summary)
+                except Exception:
+                    pass
             break
         except Exception:
             logger.exception("Unhandled error in cycle — will retry next interval")

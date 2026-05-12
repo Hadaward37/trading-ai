@@ -58,6 +58,40 @@
 - [x] **LSTM Neural Network** — `core/lstm_model.py` + `core/lstm_trainer.py` (55.41% acurácia, 12.260 amostras, retreino semanal automático)
 - [x] **RAG Copom** — `core/macro_context.py` + `scripts/ingest_copom.py` (BCB API, tom DOVISH detectado, +10/-10 pts em ações BR)
 
+### ✅ Observer Agent — Observação Contínua (2026-05-12)
+
+**REGRA ABSOLUTA: apenas observa, registra e alerta. Nunca bloqueia, decide ou interfere no Sistema 1.**
+
+- [x] **Observer Agent** — `research/fractal_lab/observer/agent.py` integrado ao `core/scheduler.py`
+- [x] **Integração non-blocking** — hook 1H ao lado do Sistema 1, sem acoplamento
+- [x] **Event Bus tipado** — `Event`, `EventBus`, `Severity` (INFO/WARNING/CRITICAL), 5 `EventType`s
+- [x] **5 Monitores** — RegimeMonitor, EdgeHealthMonitor, DegradationDetector, FailureCascadeMonitor, StructuralWarningEngine
+- [x] **Alert Fatigue Control** (`alert_throttle.py`):
+  - Cooldowns: INFO=12H | WARNING=4H | CRITICAL=2H
+  - Bypass automático: severity escalou OU PF degradou >15%
+  - AlertAggregator: agrupa por ativo → 1 mensagem por ciclo (evita spam)
+- [x] **System Health Score** (`health_score.py`) — score 0-100 observacional:
+  - Regime risk (25%) + Rolling PF (25%) + Robustness (20%) + Cascade (15%) + Structural (15%)
+  - Bandas: EXCELLENT≥90 | GOOD≥75 | MODERATE≥60 | POOR≥40 | CRITICAL<40
+  - Breakdown salvo em `data/observer_health.json` com `components` e `notes`
+  - Score atual: 83/100 GOOD (EURUSD saudável, GOLD edge degradado, BTC HIGH_VOL)
+- [x] **Telegram 6H Summary** — health score + riscos estruturais + ativos degradados + regimes
+- [x] **Snapshot Engine** — `data/observer_snapshots/` + `data/observer_state.json` + `data/observer_logs/`
+- [x] **Risk Context** — `data/observer_context.json` para Sistema 1 ler (sem acoplamento)
+
+**Alertas detectados em produção (2026-05-12):**
+- EURUSD×MR_RSI: cascata 4 losses consecutivos (threshold=5) — WARNING
+- BTC×MR_RSI: HIGH_VOL persiste 34h (anomalia, P95=21h) — WARNING
+- GOLD×TF_Momentum: edge DEGRADADO, PF30=0.612 vs baseline 1.219 (50%) — WARNING
+
+**Comandos:**
+```powershell
+python -X utf8 -m research.fractal_lab.observer.agent --targets EURUSD:MR_RSI_Exhaust BTC:MR_RSI_Exhaust
+python -X utf8 -m research.fractal_lab.observer.agent --loop --interval 3600
+```
+
+---
+
 ### ✅ Fase 2 — Inteligência de Notícias (concluída 2026-05-05)
 - [x] **Groq API (Llama 3.3 70B)** — análise de sentimento gratuita (14.400 req/dia)
 - [x] **Pipeline completo**: Yahoo Finance RSS coleta → Groq classifica → score integrado
