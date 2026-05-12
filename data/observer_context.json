@@ -1,0 +1,81 @@
+{
+  "last_updated": "2026-05-12T02:14:52.353940+00:00",
+  "contexts": {
+    "EURUSD_MR_RSI_Exhaust": {
+      "current_regime": "LOW_VOLATILITY",
+      "recent_transition": null,
+      "expected_pf_delta": null,
+      "rolling_pf_30": 1.5622,
+      "pf_baseline": 1.372,
+      "edge_health": "HEALTHY",
+      "severity": "INFO",
+      "structural_notes": [],
+      "next_regime_probs": {
+        "TRENDING": 0.575,
+        "MEAN_REVERTING": 0.066,
+        "HIGH_VOLATILITY": 0.359,
+        "LOW_VOLATILITY": 0.0
+      },
+      "steady_state": 0.143,
+      "decay_status": "IMPROVING"
+    },
+    "BTC_MR_RSI_Exhaust": {
+      "current_regime": "HIGH_VOLATILITY",
+      "recent_transition": null,
+      "expected_pf_delta": null,
+      "rolling_pf_30": 1.1146,
+      "pf_baseline": 1.274,
+      "edge_health": "HEALTHY",
+      "severity": "WARNING",
+      "structural_notes": [
+        "MR em HIGH_VOL: PF historicamente volatil (1.0-1.7 dependendo do ativo). Aguardar confirmacao de regime."
+      ],
+      "next_regime_probs": {
+        "TRENDING": 0.77,
+        "MEAN_REVERTING": 0.102,
+        "HIGH_VOLATILITY": 0.0,
+        "LOW_VOLATILITY": 0.128
+      },
+      "steady_state": 0.367,
+      "decay_status": "STABLE"
+    },
+    "GOLD_TF_Momentum": {
+      "current_regime": "TRENDING",
+      "recent_transition": null,
+      "expected_pf_delta": null,
+      "rolling_pf_30": 0.612,
+      "pf_baseline": 1.219,
+      "edge_health": "DEGRADED",
+      "severity": "WARNING",
+      "structural_notes": [
+        "Edge degradado: rolling PF30=0.612 vs baseline 1.219."
+      ],
+      "next_regime_probs": {
+        "TRENDING": 0.0,
+        "MEAN_REVERTING": 0.093,
+        "HIGH_VOLATILITY": 0.696,
+        "LOW_VOLATILITY": 0.211
+      },
+      "steady_state": 0.406,
+      "decay_status": "STABLE"
+    },
+    "DXY_MR_EMA_Dist": {
+      "current_regime": "TRENDING",
+      "recent_transition": null,
+      "expected_pf_delta": null,
+      "rolling_pf_30": 1.0117,
+      "pf_baseline": 1.166,
+      "edge_health": "HEALTHY",
+      "severity": "INFO",
+      "structural_notes": [],
+      "next_regime_probs": {
+        "TRENDING": 0.0,
+        "MEAN_REVERTING": 0.093,
+        "HIGH_VOLATILITY": 0.696,
+        "LOW_VOLATILITY": 0.211
+      },
+      "steady_state": 0.406,
+      "decay_status": "STABLE"
+    }
+  }
+}

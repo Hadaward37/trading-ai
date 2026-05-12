@@ -1,0 +1,366 @@
+{
+  "snapshot_id": "20260512_021452",
+  "trigger": "periodic",
+  "timestamp": "2026-05-12T02:14:52.337934+00:00",
+  "state": {
+    "started_at": "2026-05-12T02:13:51.740393+00:00",
+    "n_cycles": 1,
+    "n_events": 7,
+    "n_criticals": 0,
+    "n_warnings": 6,
+    "last_cycle": "2026-05-12T02:13:51.740393+00:00",
+    "assets": {
+      "EURUSD_MR_RSI_Exhaust": {
+        "asset": "EURUSD",
+        "hypothesis": "MR_RSI_Exhaust",
+        "regime": {
+          "current_regime": "LOW_VOLATILITY",
+          "bars_in_regime": 5,
+          "prev_regime": null,
+          "next_probs": {
+            "TRENDING": 0.575,
+            "MEAN_REVERTING": 0.066,
+            "HIGH_VOLATILITY": 0.359,
+            "LOW_VOLATILITY": 0.0
+          },
+          "steady_state_pct": 0.143
+        },
+        "n_trades": 904,
+        "edge_health": {
+          "n_trades": 904,
+          "pf_baseline": 1.372,
+          "rolling": {
+            "pf_30": 1.5622,
+            "sharpe_30": 0.1991,
+            "pf_60": 1.3447,
+            "sharpe_60": 0.1304,
+            "pf_90": 1.6004,
+            "sharpe_90": 0.2049
+          },
+          "edge_health": "HEALTHY"
+        },
+        "degradation": {
+          "pf_30": 1.5622,
+          "pf_60": 1.3447,
+          "pf_90": 1.6004,
+          "robustness_proxy": 0.925,
+          "degradation_status": "NORMAL"
+        },
+        "cascade": {
+          "current_streak": 4,
+          "conditional_p_loss": 0.6333,
+          "cascade_risk": "WARNING"
+        },
+        "risk_context": {
+          "current_regime": "LOW_VOLATILITY",
+          "recent_transition": null,
+          "expected_pf_delta": null,
+          "rolling_pf_30": 1.5622,
+          "pf_baseline": 1.372,
+          "edge_health": "HEALTHY",
+          "severity": "INFO",
+          "structural_notes": [],
+          "next_regime_probs": {
+            "TRENDING": 0.575,
+            "MEAN_REVERTING": 0.066,
+            "HIGH_VOLATILITY": 0.359,
+            "LOW_VOLATILITY": 0.0
+          },
+          "steady_state": 0.143,
+          "decay_status": "IMPROVING"
+        }
+      },
+      "BTC_MR_RSI_Exhaust": {
+        "asset": "BTC",
+        "hypothesis": "MR_RSI_Exhaust",
+        "regime": {
+          "current_regime": "HIGH_VOLATILITY",
+          "bars_in_regime": 32,
+          "prev_regime": null,
+          "next_probs": {
+            "TRENDING": 0.77,
+            "MEAN_REVERTING": 0.102,
+            "HIGH_VOLATILITY": 0.0,
+            "LOW_VOLATILITY": 0.128
+          },
+          "steady_state_pct": 0.367
+        },
+        "n_trades": 1412,
+        "edge_health": {
+          "n_trades": 1412,
+          "pf_baseline": 1.274,
+          "rolling": {
+            "pf_30": 1.1146,
+            "sharpe_30": 0.0489,
+            "pf_60": 1.1009,
+            "sharpe_60": 0.0426,
+            "pf_90": 1.0018,
+            "sharpe_90": 0.0008
+          },
+          "edge_health": "HEALTHY"
+        },
+        "degradation": {
+          "pf_30": 1.1146,
+          "pf_60": 1.1009,
+          "pf_90": 1.0018,
+          "robustness_proxy": 0.9531,
+          "degradation_status": "NORMAL"
+        },
+        "cascade": {
+          "current_streak": 0,
+          "conditional_p_loss": null,
+          "cascade_risk": "NONE"
+        },
+        "risk_context": {
+          "current_regime": "HIGH_VOLATILITY",
+          "recent_transition": null,
+          "expected_pf_delta": null,
+          "rolling_pf_30": 1.1146,
+          "pf_baseline": 1.274,
+          "edge_health": "HEALTHY",
+          "severity": "WARNING",
+          "structural_notes": [
+            "MR em HIGH_VOL: PF historicamente volatil (1.0-1.7 dependendo do ativo). Aguardar confirmacao de regime."
+          ],
+          "next_regime_probs": {
+            "TRENDING": 0.77,
+            "MEAN_REVERTING": 0.102,
+            "HIGH_VOLATILITY": 0.0,
+            "LOW_VOLATILITY": 0.128
+          },
+          "steady_state": 0.367,
+          "decay_status": "STABLE"
+        }
+      },
+      "GOLD_TF_Momentum": {
+        "asset": "GOLD",
+        "hypothesis": "TF_Momentum",
+        "regime": {
+          "current_regime": "TRENDING",
+          "bars_in_regime": 8,
+          "prev_regime": null,
+          "next_probs": {
+            "TRENDING": 0.0,
+            "MEAN_REVERTING": 0.093,
+            "HIGH_VOLATILITY": 0.696,
+            "LOW_VOLATILITY": 0.211
+          },
+          "steady_state_pct": 0.406
+        },
+        "n_trades": 1027,
+        "edge_health": {
+          "n_trades": 1027,
+          "pf_baseline": 1.219,
+          "rolling": {
+            "pf_30": 0.612,
+            "sharpe_30": -0.2342,
+            "pf_60": 0.9528,
+            "sharpe_60": -0.0215,
+            "pf_90": 0.8442,
+            "sharpe_90": -0.0756
+          },
+          "edge_health": "DEGRADED"
+        },
+        "degradation": {
+          "pf_30": 0.612,
+          "pf_60": 0.9528,
+          "pf_90": 0.8442,
+          "robustness_proxy": 0.823,
+          "degradation_status": "OOS_DRIFT"
+        },
+        "cascade": {
+          "current_streak": 1,
+          "conditional_p_loss": 0.5741,
+          "cascade_risk": "NONE"
+        },
+        "risk_context": {
+          "current_regime": "TRENDING",
+          "recent_transition": null,
+          "expected_pf_delta": null,
+          "rolling_pf_30": 0.612,
+          "pf_baseline": 1.219,
+          "edge_health": "DEGRADED",
+          "severity": "WARNING",
+          "structural_notes": [
+            "Edge degradado: rolling PF30=0.612 vs baseline 1.219."
+          ],
+          "next_regime_probs": {
+            "TRENDING": 0.0,
+            "MEAN_REVERTING": 0.093,
+            "HIGH_VOLATILITY": 0.696,
+            "LOW_VOLATILITY": 0.211
+          },
+          "steady_state": 0.406,
+          "decay_status": "STABLE"
+        }
+      },
+      "DXY_MR_EMA_Dist": {
+        "asset": "DXY",
+        "hypothesis": "MR_EMA_Dist",
+        "regime": {
+          "current_regime": "TRENDING",
+          "bars_in_regime": 1,
+          "prev_regime": null,
+          "next_probs": {
+            "TRENDING": 0.0,
+            "MEAN_REVERTING": 0.093,
+            "HIGH_VOLATILITY": 0.696,
+            "LOW_VOLATILITY": 0.211
+          },
+          "steady_state_pct": 0.406
+        },
+        "n_trades": 1442,
+        "edge_health": {
+          "n_trades": 1442,
+          "pf_baseline": 1.166,
+          "rolling": {
+            "pf_30": 1.0117,
+            "sharpe_30": 0.0055,
+            "pf_60": 1.1544,
+            "sharpe_60": 0.0649,
+            "pf_90": 1.0725,
+            "sharpe_90": 0.0308
+          },
+          "edge_health": "HEALTHY"
+        },
+        "degradation": {
+          "pf_30": 1.0117,
+          "pf_60": 1.1544,
+          "pf_90": 1.0725,
+          "robustness_proxy": 0.9459,
+          "degradation_status": "NORMAL"
+        },
+        "cascade": {
+          "current_streak": 2,
+          "conditional_p_loss": 0.6536,
+          "cascade_risk": "WATCH"
+        },
+        "risk_context": {
+          "current_regime": "TRENDING",
+          "recent_transition": null,
+          "expected_pf_delta": null,
+          "rolling_pf_30": 1.0117,
+          "pf_baseline": 1.166,
+          "edge_health": "HEALTHY",
+          "severity": "INFO",
+          "structural_notes": [],
+          "next_regime_probs": {
+            "TRENDING": 0.0,
+            "MEAN_REVERTING": 0.093,
+            "HIGH_VOLATILITY": 0.696,
+            "LOW_VOLATILITY": 0.211
+          },
+          "steady_state": 0.406,
+          "decay_status": "STABLE"
+        }
+      }
+    }
+  },
+  "recent_events": [
+    {
+      "event_type": "cascade_alert",
+      "severity": "WARNING",
+      "asset": "EURUSD",
+      "hypothesis": "MR_RSI_Exhaust",
+      "regime": null,
+      "message": "Cascata: 4 losses consecutivos (threshold=5). P(loss|4) = 63.33% vs baseline 62.50%.",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "streak": 4,
+        "cond_p_loss": 0.6333333333333333
+      }
+    },
+    {
+      "event_type": "structural_warning",
+      "severity": "WARNING",
+      "asset": "BTC",
+      "hypothesis": null,
+      "regime": "HIGH_VOLATILITY",
+      "message": "Regime HIGH_VOLATILITY persiste ha 32 bars (baseline P95 = 21h). Anomalia de persistencia.",
+      "timestamp": "2026-05-12T02:14:04.796955+00:00",
+      "data": {
+        "bars_in_regime": 32,
+        "p95_baseline": 20.7
+      }
+    },
+    {
+      "event_type": "structural_warning",
+      "severity": "WARNING",
+      "asset": "BTC",
+      "hypothesis": "MR_RSI_Exhaust",
+      "regime": "HIGH_VOLATILITY",
+      "message": "MR em HIGH_VOL: PF historicamente volatil (1.0-1.7 dependendo do ativo). Aguardar confirmacao de regime.",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "regime": "HIGH_VOLATILITY",
+        "hyp_group": "mean_reversion",
+        "transition": null,
+        "structural_notes": [
+          "MR em HIGH_VOL: PF historicamente volatil (1.0-1.7 dependendo do ativo). Aguardar confirmacao de regime."
+        ]
+      }
+    },
+    {
+      "event_type": "edge_decay_alert",
+      "severity": "WARNING",
+      "asset": "GOLD",
+      "hypothesis": "TF_Momentum",
+      "regime": null,
+      "message": "Rolling PF (30T) = 0.612 vs baseline 1.219 (ratio 50.21%) -- edge degraded",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "window": 30,
+        "rolling_pf": 0.612,
+        "baseline_pf": 1.219,
+        "ratio": 0.5021,
+        "rolling_sharpe": -0.2342
+      }
+    },
+    {
+      "event_type": "edge_decay_alert",
+      "severity": "WARNING",
+      "asset": "GOLD",
+      "hypothesis": "TF_Momentum",
+      "regime": null,
+      "message": "Rolling PF (90T) = 0.844 vs baseline 1.219 (ratio 69.26%) -- edge degraded",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "window": 90,
+        "rolling_pf": 0.8442,
+        "baseline_pf": 1.219,
+        "ratio": 0.6926,
+        "rolling_sharpe": -0.0756
+      }
+    },
+    {
+      "event_type": "structural_warning",
+      "severity": "WARNING",
+      "asset": "GOLD",
+      "hypothesis": "TF_Momentum",
+      "regime": "TRENDING",
+      "message": "Edge degradado: rolling PF30=0.612 vs baseline 1.219.",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "regime": "TRENDING",
+        "hyp_group": "trend_follow",
+        "transition": null,
+        "structural_notes": [
+          "Edge degradado: rolling PF30=0.612 vs baseline 1.219."
+        ]
+      }
+    },
+    {
+      "event_type": "cascade_alert",
+      "severity": "INFO",
+      "asset": "DXY",
+      "hypothesis": "MR_EMA_Dist",
+      "regime": null,
+      "message": "Cascata: 2 losses consecutivos (threshold=5). P(loss|2) = 65.36% vs baseline 62.50%.",
+      "timestamp": "2026-05-12T02:13:51.740393+00:00",
+      "data": {
+        "streak": 2,
+        "cond_p_loss": 0.6535893155258765
+      }
+    }
+  ]
+}

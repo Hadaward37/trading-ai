@@ -1,0 +1,90 @@
+{
+  "snapshot_id": "20260512_021251",
+  "trigger": "periodic",
+  "timestamp": "2026-05-12T02:12:51.313437+00:00",
+  "state": {
+    "started_at": "2026-05-12T02:12:36.407356+00:00",
+    "n_cycles": 1,
+    "n_events": 1,
+    "n_criticals": 0,
+    "n_warnings": 1,
+    "last_cycle": "2026-05-12T02:12:36.407356+00:00",
+    "assets": {
+      "EURUSD_MR_RSI_Exhaust": {
+        "asset": "EURUSD",
+        "hypothesis": "MR_RSI_Exhaust",
+        "regime": {
+          "current_regime": "LOW_VOLATILITY",
+          "bars_in_regime": 5,
+          "prev_regime": null,
+          "next_probs": {
+            "TRENDING": 0.575,
+            "MEAN_REVERTING": 0.066,
+            "HIGH_VOLATILITY": 0.359,
+            "LOW_VOLATILITY": 0.0
+          },
+          "steady_state_pct": 0.143
+        },
+        "n_trades": 904,
+        "edge_health": {
+          "n_trades": 904,
+          "pf_baseline": 1.372,
+          "rolling": {
+            "pf_30": 1.5622,
+            "sharpe_30": 0.1991,
+            "pf_60": 1.3447,
+            "sharpe_60": 0.1304,
+            "pf_90": 1.6004,
+            "sharpe_90": 0.2049
+          },
+          "edge_health": "HEALTHY"
+        },
+        "degradation": {
+          "pf_30": 1.5622,
+          "pf_60": 1.3447,
+          "pf_90": 1.6004,
+          "robustness_proxy": 0.925,
+          "degradation_status": "NORMAL"
+        },
+        "cascade": {
+          "current_streak": 4,
+          "conditional_p_loss": 0.6333,
+          "cascade_risk": "WARNING"
+        },
+        "risk_context": {
+          "current_regime": "LOW_VOLATILITY",
+          "recent_transition": null,
+          "expected_pf_delta": null,
+          "rolling_pf_30": 1.5622,
+          "pf_baseline": 1.372,
+          "edge_health": "HEALTHY",
+          "severity": "INFO",
+          "structural_notes": [],
+          "next_regime_probs": {
+            "TRENDING": 0.575,
+            "MEAN_REVERTING": 0.066,
+            "HIGH_VOLATILITY": 0.359,
+            "LOW_VOLATILITY": 0.0
+          },
+          "steady_state": 0.143,
+          "decay_status": "IMPROVING"
+        }
+      }
+    }
+  },
+  "recent_events": [
+    {
+      "event_type": "cascade_alert",
+      "severity": "WARNING",
+      "asset": "EURUSD",
+      "hypothesis": "MR_RSI_Exhaust",
+      "regime": null,
+      "message": "Cascata: 4 losses consecutivos (threshold=5). P(loss|4) = 63.33% vs baseline 62.50%.",
+      "timestamp": "2026-05-12T02:12:36.407356+00:00",
+      "data": {
+        "streak": 4,
+        "cond_p_loss": 0.6333333333333333
+      }
+    }
+  ]
+}
