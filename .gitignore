@@ -18,3 +18,5 @@ build/
 models/*.h5
 models/*.pkl
 models/lstm_metrics.json
+knowledge-base/pdfs/*.pdf
+knowledge-base/livros/*.pdf
