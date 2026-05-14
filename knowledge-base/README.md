@@ -3,7 +3,7 @@
 ## PDFs disponíveis
 - López de Prado Lecture 1/10 (ssrn-3270329)
 - López de Prado Lecture 10/10 (ssrn-3447398)
-- ssrn-3104816 (López de Prado — artigo adicional)
+- López de Prado — "The 10 Reasons Most ML Funds Fail" (ssrn-3104816, 2018, Journal of Portfolio Management)
 
 ## Vídeos
 - asimov_mt5_b3.md → Tutorial MT5 + Python
