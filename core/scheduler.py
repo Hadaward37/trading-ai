@@ -27,6 +27,7 @@ if str(_ROOT) not in sys.path:
 import config
 from core.backtest import run_backtest
 from core.collector import fetch_ohlcv
+from core.healthcheck import heartbeat, start_healthcheck
 from core.indicators import add_all_indicators
 from core.news_filter import is_danger_zone
 from core.notifier import SignalAlert, TelegramNotifier
@@ -261,6 +262,32 @@ def _run_asset(
 
         # ── Alert logic ───────────────────────────────────────────────────────
         if cur_signal != 0 and cur_signal != last_signal:
+            try:
+                from core.signal_logger import log_signal
+                log_signal(
+                    symbol=symbol,
+                    signal=cur_name,
+                    price_at_signal=float(last_row["close"]),
+                    features={
+                        "rsi":          round(float(last_row.get("rsi",          0.0)), 2),
+                        "adx":          round(float(last_row.get("adx",          0.0)), 2),
+                        "atr":          round(float(last_row.get("atr",          0.0)), 5),
+                        "bb_pct":       round(float(last_row.get("bb_pct",       0.5)), 4),
+                        "stoch_k":      round(float(last_row.get("stoch_k",     50.0)), 2),
+                        "macd":         round(float(last_row.get("macd",         0.0)), 6),
+                        "score":        round(float(last_row.get("score",        0.0)), 1),
+                        "final_score":  round(float(last_row.get("final_score",  0.0)), 1),
+                        "lstm_prob":    round(float(last_row.get("lstm_prob",   50.0)), 1),
+                        "xgboost_prob": round(float(last_row.get("xgboost_prob",50.0)), 1),
+                        "ensemble_prob":round(float(last_row.get("ensemble_prob", 0.0)),1),
+                        "sentiment":    str(last_row.get("sentiment", "NEUTRAL")),
+                    },
+                    regime=None,
+                    metadata={"source": "system_1", "timeframe": config.SCHEDULER_TIMEFRAME},
+                )
+            except Exception:
+                pass
+
             news_blocked, news_reason = is_danger_zone()
             if news_blocked:
                 logger.info("[%s] News filter blocked — %s", name, news_reason)
@@ -307,6 +334,7 @@ def run_once(
     """Execute one pipeline cycle for ALL configured assets."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     logger.info("=== Cycle start | %s | %d assets ===", now, len(config.ASSETS))
+    heartbeat()
 
     updated: dict[str, int] = {}
     for name, symbol in config.ASSETS.items():
@@ -319,6 +347,7 @@ def run_scheduler() -> None:
     """Infinite polling loop. Runs :func:`run_once` every
     :data:`config.SCHEDULER_INTERVAL_MIN` minutes."""
     interval_sec = config.SCHEDULER_INTERVAL_MIN * 60
+    start_healthcheck()
 
     notifier = TelegramNotifier(
         token   = config.TELEGRAM_BOT_TOKEN,
