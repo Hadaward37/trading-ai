@@ -1,22 +1,44 @@
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
-.env
-*.whl
-data/trading.db
-data/raw/
-data/processed/
-*.log
-.DS_Store
-Thumbs.db
-.pytest_cache/
+.Python
 *.egg-info/
 dist/
 build/
-models/*.h5
-models/*.pkl
-models/lstm_metrics.json
-knowledge-base/pdfs/*.pdf
-knowledge-base/livros/*.pdf
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Trading AI runtime data
+logs/
+*.jsonl
+heartbeat.txt
+data/trading.db-shm
+data/trading.db-wal
+data/fractal_lab.db
+
+# ML model artefacts
+data/hmm_model.joblib
+
+# MQL5 compiled
+mql5/*.ex5
