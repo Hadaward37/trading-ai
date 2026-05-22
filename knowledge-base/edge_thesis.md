@@ -207,3 +207,47 @@ Se houver travamento durante a incubação, o pacto é: registrar o incidente,
 NÃO mexer no código, fazer reboot via console, e contabilizar o gap no 
 notebook de análise 06/06.
 
+---
+
+## Nota operacional — 22/05/2026 (parte 2)
+
+**Hardening de infra durante incubação:**
+
+Ativado 1 GB de swap na VM Oracle para mitigar risco de OOM/travamento 
+durante a incubação. Comando: `fallocate /swapfile + mkswap + swapon`, 
+persistido em `/etc/fstab`.
+
+**Justificativa:**
+Mesmo com observator e polymarket pausados, a VM continua tendo apenas 
+1 GB de RAM física. Swap não é solução de performance (é lento), mas é 
+rede de segurança contra travamento do sshd em caso de pico de memória 
+(GC do Python, payload grande do yfinance, etc).
+
+**Estado pós-swap:**
+- RAM física: 957 MB (447 MB livre com trading-ai rodando)
+- Swap: 1 GB (zero uso esperado em operação normal)
+- Se swap começar a ser usado: sinal de que precisa upgrade para A1.Flex
+
+---
+
+## Débito técnico identificado — 22/05/2026
+
+**Observator NÃO é systemd unit:**
+
+Durante o recovery de 22/05/2026 descobriu-se que `trading-ai-observator` 
+estava rodando como processo `nohup` solto, não como systemd service. 
+Por isso não reiniciou automaticamente após o reboot da VM (comportamento 
+desejado durante a incubação, mas frágil em produção normal).
+
+**Ação programada para pós-06/06/2026 (NÃO FAZER ANTES):**
+
+1. Criar `trading-ai-observator.service` em `/etc/systemd/system/`
+2. Definir `Restart=on-failure`, `MemoryLimit=200M` (proteção contra OOM)
+3. Habilitar com `systemctl enable`
+4. Documentar comando exato de start em `knowledge-base/ops.md`
+5. Só reativar APÓS upgrade da VM para A1.Flex ARM (24 GB grátis)
+
+**Por que não fazer agora:**
+Mexer em systemd durante a incubação viola o pacto de congelamento. 
+O observator está corretamente desativado para a janela de 16 dias.
+
