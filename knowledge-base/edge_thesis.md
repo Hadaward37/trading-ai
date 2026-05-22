@@ -176,3 +176,34 @@ Para análise pós-06/06, o notebook deve gerar:
 9. Classificação de regime do período (vol IBOV, tendência, eventos macro)
 10. Distribuição temporal: hora do dia, dia da semana, primeira/segunda metade do mês
 11. Healthcheck logs: quantos disparos, quando, por quê
+
+---
+
+## Nota operacional — 22/05/2026
+
+**Decisão de infraestrutura durante incubação:**
+
+A VM Oracle (VM.Standard.E2.1.Micro, 1 OCPU / 1 GB RAM) demonstrou memory 
+pressure com 3 serviços Python concorrentes (trading-ai, trading-ai-observator, 
+polymarket-bot), causando travamento do sshd em 21/05/2026.
+
+**Ação tomada:**
+- `polymarket-bot.service` → STOP + DISABLE
+- `polymarket-dashboard.service` → STOP + DISABLE
+- Apenas `trading-ai.service` permanece ativo durante a incubação
+
+**Justificativa:**
+Garantir recursos exclusivos ao Sistema 1 elimina a variável confusora 
+"memory pressure → execution lag → signal loss" da análise pós-06/06.
+A incubação mede edge do Sistema 1 — não capacidade da VM de rodar 3 bots.
+
+**Reativação programada:**
+Polymarket e dashboard serão reativados após 06/06/2026, junto com 
+avaliação de upgrade da VM (candidato: A1.Flex ARM, 24 GB grátis).
+
+**Risco residual aceito:**
+Mesmo com apenas 1 serviço, a VM ainda tem só 1 GB de RAM sem swap. 
+Se houver travamento durante a incubação, o pacto é: registrar o incidente, 
+NÃO mexer no código, fazer reboot via console, e contabilizar o gap no 
+notebook de análise 06/06.
+
