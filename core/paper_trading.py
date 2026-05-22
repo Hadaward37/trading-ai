@@ -329,11 +329,15 @@ class VirtualPortfolio:
             quantity       = trade["quantity"]
             position_value = trade["position_value"]
 
-            if direction == "BUY":
-                pnl = (exit_price - entry_price) * quantity
-            else:
-                pnl = (entry_price - exit_price) * quantity
-
+            # Comissão round-trip: 0.05% na entrada + 0.05% na saída
+            entry_value = entry_price * quantity
+            exit_value  = exit_price  * quantity
+            commission  = (entry_value + exit_value) * config.PAPER_TRADING_COMMISSION_PCT
+            gross_pnl   = (
+                (exit_price - entry_price) * quantity if direction == "BUY"
+                else (entry_price - exit_price) * quantity
+            )
+            pnl     = gross_pnl - commission
             pnl_pct = pnl / position_value * 100 if position_value > 0 else 0.0
 
             con.execute(

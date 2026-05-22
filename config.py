@@ -22,7 +22,7 @@ load_dotenv()
 ROOT_DIR = Path(__file__).parent
 
 # ── MetaTrader 5 integration ──────────────────────────────────────────────────
-USE_MT5        = True              # True = use MT5 terminal for EURUSD data
+USE_MT5        = False             # desativado na incubação (EUR/USD removido do universo)
 MT5_SYMBOL     = "EURUSD"          # MT5 symbol name (no "=X" suffix)
 MT5_TIMEOUT_MS = 60_000            # connection timeout in milliseconds
 
@@ -34,13 +34,15 @@ DB_PATH     = ROOT_DIR / "data" / "trading.db"
 
 # ── Multi-asset universe ──────────────────────────────────────────────────────
 ASSETS: dict[str, str] = {
-    "EUR/USD": "EURUSD=X",
     "VALE3":   "VALE3.SA",
     "PETR4":   "PETR4.SA",
     "ITUB4":   "ITUB4.SA",
     "BBDC4":   "BBDC4.SA",
     "IBOV":    "^BVSP",
 }
+
+# Ativos usados apenas como benchmark (sinais são logados, mas NÃO geram trades no paper portfolio)
+BENCHMARK_ASSETS: set[str] = {"IBOV"}
 
 # Per-asset display metadata
 ASSET_META: dict[str, dict] = {
@@ -147,12 +149,26 @@ NEWS_FILTER_CURRENCIES     = ("USD", "EUR", "BRL")  # currencies whose events bl
 PAPER_TRADING_ENABLED = True
 PAPER_TRADING_CAPITAL = 10_000.0   # capital inicial em R$/USD
 
+# ── Incubação 2026-05-22 → 2026-06-06 (strategy v1.0) ────────────────────────
+
+# Custos de transação aplicados no paper trading
+# 0.05% por lado = 0.10% round-trip (cobre emolumentos B3 + ISS + slippage estimado)
+PAPER_TRADING_COMMISSION_PCT = 0.0005  # 0.05% por lado
+
+# Threshold mínimo de confiança (escala 0-100, mesmo do final_score)
+# Sinais com final_score >= threshold geram trade
+# Sinais com final_score < threshold são LOGADOS mas NÃO executam trade
+SIGNAL_CONFIDENCE_THRESHOLD = 55
+
+# Versionamento da estratégia para análise pós-06/06
+STRATEGY_VERSION = "v1.0"
+
 # ── News Intelligence — Phase 2 (Gemini + GPT-4o) ────────────────────────────
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 GROQ_API_KEY:   str = os.getenv("GROQ_API_KEY", "")
 GEMINI_MODEL              = "gemini-2.0-flash"          # ajuste conforme quota disponível
 GROQ_MODEL                = "llama-3.3-70b-versatile"   # free tier: 14400 req/dia
-NEWS_INTELLIGENCE_ENABLED     = True    # master switch
+NEWS_INTELLIGENCE_ENABLED     = False   # desativado na incubação (rate limit invalida qualidade)
 NEWS_INTELLIGENCE_TTL_SECONDS = 300     # cache per-ticker — 5 minutes
 SENTIMENT_SCORE_WEIGHT        = 15      # max pts added/removed from technical score

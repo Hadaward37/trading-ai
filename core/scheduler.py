@@ -234,10 +234,13 @@ def _run_asset(
                 except Exception:
                     pass
 
-            # 2. Abrir nova posição se sinal mudou (e não bloqueado por news)
+            # 2. Abrir nova posição se sinal mudou, passou threshold e não é benchmark
             if cur_signal != 0 and cur_signal != last_signal:
-                news_blocked, _ = is_danger_zone()
-                if not news_blocked:
+                _final_score      = float(last_row.get("final_score", 0))
+                _passed_threshold = _final_score >= config.SIGNAL_CONFIDENCE_THRESHOLD
+                _is_benchmark     = name in getattr(config, "BENCHMARK_ASSETS", set())
+                news_blocked, _   = is_danger_zone()
+                if not news_blocked and _passed_threshold and not _is_benchmark:
                     price = float(last_row["close"])
                     atr   = float(last_row["atr"])
                     if cur_signal == 1:   # BUY
@@ -255,15 +258,21 @@ def _run_asset(
                         stop_loss   = round(sl, meta["decimals"]),
                         take_profit = round(tp, meta["decimals"]),
                         signal_score  = float(last_row.get("score", 0)),
-                        final_score   = float(last_row.get("final_score", 0)),
+                        final_score   = _final_score,
                         sentiment     = str(last_row.get("sentiment", "NEUTRAL")),
                         timeframe     = config.SCHEDULER_TIMEFRAME,
+                    )
+                elif not _is_benchmark:
+                    logger.info(
+                        "[%s] Signal logged but NOT executed — final_score=%.1f < threshold=%d",
+                        name, _final_score, config.SIGNAL_CONFIDENCE_THRESHOLD,
                     )
 
         # ── Alert logic ───────────────────────────────────────────────────────
         if cur_signal != 0 and cur_signal != last_signal:
             try:
                 from core.signal_logger import log_signal
+                _fs = float(last_row.get("final_score", 0.0))
                 log_signal(
                     symbol=symbol,
                     signal=cur_name,
@@ -276,14 +285,22 @@ def _run_asset(
                         "stoch_k":      round(float(last_row.get("stoch_k",     50.0)), 2),
                         "macd":         round(float(last_row.get("macd",         0.0)), 6),
                         "score":        round(float(last_row.get("score",        0.0)), 1),
-                        "final_score":  round(float(last_row.get("final_score",  0.0)), 1),
+                        "final_score":  round(_fs, 1),
                         "lstm_prob":    round(float(last_row.get("lstm_prob",   50.0)), 1),
                         "xgboost_prob": round(float(last_row.get("xgboost_prob",50.0)), 1),
                         "ensemble_prob":round(float(last_row.get("ensemble_prob", 0.0)),1),
                         "sentiment":    str(last_row.get("sentiment", "NEUTRAL")),
                     },
                     regime=None,
-                    metadata={"source": "system_1", "timeframe": config.SCHEDULER_TIMEFRAME},
+                    metadata={
+                        "source":           "system_1",
+                        "timeframe":        config.SCHEDULER_TIMEFRAME,
+                        "strategy_version": config.STRATEGY_VERSION,
+                        "final_score":      round(_fs, 1),
+                        "passed_threshold": _fs >= config.SIGNAL_CONFIDENCE_THRESHOLD,
+                        "is_benchmark":     name in getattr(config, "BENCHMARK_ASSETS", set()),
+                        "threshold_value":  config.SIGNAL_CONFIDENCE_THRESHOLD,
+                    },
                 )
             except Exception:
                 pass
