@@ -53,6 +53,7 @@ ssh -i ~/.ssh/ssh-key-2026-05-05.key ubuntu@137.131.228.166 \
 |---|---|
 | `knowledge-base/edge_thesis.md` | Tese + critérios validação/invalidação |
 | `knowledge-base/post_incubation_plan.md` | Decisão por cenário (A-F) |
+| `knowledge-base/phase_2_proposal.md` | Proposta de research engine com LLM local (condicional, +90 dias pós-validação Sistema 1) |
 | `knowledge-base/ops_runbook.md` | Comandos de reativação SSH |
 | `logs/signals.jsonl` | Dataset em acúmulo (na Oracle) |
 | `notebooks/analise_06_06.ipynb` | Notebook de análise pronto para rodar |

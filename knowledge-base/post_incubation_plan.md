@@ -33,6 +33,9 @@ identificar o cenário abaixo e seguir o protocolo correspondente.
    - B5: 0.1x
    (apenas se PF rolling 30d > 1.0)
 6. Iniciar Sistema 2 (Historical Similarity Engine com Pythex)
+7. **Após 90 dias de PF > 1.3 estável em produção:** avaliar Fase 2
+   (research engine com LLM local). Ver `knowledge-base/phase_2_proposal.md`.
+   NÃO iniciar antes do gate de 90 dias.
 
 ---
 
