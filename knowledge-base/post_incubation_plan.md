@@ -1,7 +1,7 @@
 # Plano Pós-Incubação — Sistema 1 v1.0
 
 **Data de criação:** 22/05/2026  
-**Válido para revisão de:** 06/06/2026  
+**Válido para revisão de:** 06/07/2026  
 **Critérios completos em:** `knowledge-base/edge_thesis.md`
 
 Este documento é o mapa de decisão. Após rodar `notebooks/analise_06_06.ipynb`,
@@ -110,7 +110,7 @@ identificar o cenário abaixo e seguir o protocolo correspondente.
    - O que de fato aconteceu (números reais do notebook)
    - 3 lições aprendidas
    - 3 coisas que faria diferente
-   - Análise de regime: o período 22/05-06/06 foi representativo?
+   - Análise de regime: o período 22/05-06/07 foi representativo?
 
 2. Arquivar código:
    ```bash
@@ -166,9 +166,9 @@ Antes de qualquer ação pós-incubação, confirmar:
 Copiar e preencher após análise:
 
 ```markdown
-## Resultado da incubação — 06/06/2026
+## Resultado da incubação — 06/07/2026
 
-**Período:** 2026-05-22 → 2026-06-06 (16 dias)
+**Período:** 2026-05-22 → 2026-07-06 (45 dias)
 **n de trades:** ___
 **PF líquido:** ___
 **PF sem melhor trade:** ___

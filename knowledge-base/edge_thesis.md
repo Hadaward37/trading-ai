@@ -1,7 +1,7 @@
 # Edge Thesis — Sistema 1 (B3 + IBOV)
 
 **Data de criação:** 21/05/2026  
-**Próxima revisão:** 06/06/2026  
+**Próxima revisão:** 06/07/2026  
 **Strategy version:** v1.0  
 **Responsável:** Dudu (Hadaward37)  
 **Validado por:** Claude (Opus 4.7) + GPT (sócio de construção)
@@ -34,14 +34,14 @@ alguns terão edge, outros não. A análise deve segmentar por ativo."
 | Custo simulado por trade | 0.05% (ida) + 0.05% (volta) = 0.10% round-trip |
 | Capital paper trading | R$ 10.000 |
 | Sizing | Fixo (sem adaptive sizing nesta fase) |
-| Período de incubação | 22/05/2026 → 06/06/2026 |
+| Período de incubação | 22/05/2026 → 06/07/2026 |
 | Janelas de outcome | 5min, 30min, 1h, 4h, 1d |
 
 ---
 
 ## Critérios de validação (TODOS devem ser atendidos)
 
-A hipótese é considerada **VÁLIDA** em 06/06 se:
+A hipótese é considerada **VÁLIDA** em 06/07 se:
 
 - [ ] **Profit Factor (PF) >= 1.2 líquido** — após custos de 0.10% round-trip
 - [ ] **PF permanece > 1.0 após remover o melhor trade individual** — proteção contra outlier (sugestão GPT)
@@ -61,7 +61,7 @@ A hipótese é considerada **VÁLIDA** em 06/06 se:
 
 ## Critérios de invalidação (QUALQUER UM dispara pivot)
 
-A hipótese é considerada **INVALIDADA** em 06/06 se:
+A hipótese é considerada **INVALIDADA** em 06/07 se:
 
 - [ ] **PF < 0.9 líquido**
 - [ ] **Win rate < 35%** combinado com PF < 1.0
@@ -87,13 +87,13 @@ Não é validação nem invalidação. **Não adicionar features.** Ações perm
 
 ## Risco de regime de mercado (adicionado por sugestão GPT)
 
-A janela 22/05 → 06/06 pode representar apenas **um subconjunto** dos regimes de mercado possíveis.
+A janela 22/05 → 06/07 pode representar apenas **um subconjunto** dos regimes de mercado possíveis.
 
 **Implicações:**
 - Resultados positivos NÃO implicam robustez cross-regime
 - Resultados negativos também NÃO invalidam completamente a hipótese se o período tiver sido excepcionalmente anômalo (ex: choque macro, evento de cauda)
 
-**A análise pós-06/06 deve classificar o período por:**
+**A análise pós-06/07 deve classificar o período por:**
 - Volatilidade realizada do IBOV (versus média histórica 30d/90d)
 - Regime de tendência vs lateralização (ADX, slope da média móvel)
 - Direção do IBOV no período (alta/baixa/lateral)
@@ -121,12 +121,12 @@ Esse critério é binário: se falhar, sistema é arquivado **mesmo que** os cri
 
 > Eu, Dudu, me comprometo formalmente a:
 > 
-> 1. **Não mexer no código entre 22/05/2026 e 06/06/2026**, exceto se Claude/GPT solicitarem para diagnóstico
-> 2. **Respeitar os critérios acima sem racionalizar** os resultados em 06/06
+> 1. **Não mexer no código entre 22/05/2026 e 06/07/2026**, exceto se Claude/GPT solicitarem para diagnóstico
+> 2. **Respeitar os critérios acima sem racionalizar** os resultados em 06/07
 > 3. Se hipótese for **invalidada**, eu vou **pivotar a tese central** — não vou adicionar features para forçar números bons
 > 4. Se hipótese cair em **zona cinza**, eu vou seguir o protocolo restrito acima — nada além
-> 5. Vou usar os 16 dias para **acumular dataset analisável**, não para "otimizar enquanto roda"
-> 6. **Não vou consultar resultados parciais antes de 06/06** com intuito de decidir nada — consulta diária é apenas para verificar saúde operacional (heartbeat, contagem de sinais)
+> 5. Vou usar os 45 dias para **acumular dataset analisável**, não para "otimizar enquanto roda"
+> 6. **Não vou consultar resultados parciais antes de 06/07** com intuito de decidir nada — consulta diária é apenas para verificar saúde operacional (heartbeat, contagem de sinais)
 > 7. Se **15 <= trades < 30**, eu NÃO vou declarar "edge encontrado" mesmo com PF bom — vou classificar como "promissor para nova rodada de incubação"
 > 
 > Assinatura: Dudu  
@@ -146,7 +146,7 @@ Coisas que NÃO sei se afetam o resultado, mas estou aceitando como tradeoff:
 
 ---
 
-## Pós 06/06 — Decisão por cenário (pré-registrada)
+## Pós 06/07 — Decisão por cenário (pré-registrada)
 
 | Cenário | PF líquido | Trades | Ação |
 |---|---|---|---|
@@ -163,7 +163,7 @@ Esta tabela é vinculante. Foi feita ANTES dos dados existirem.
 
 ## Métricas adicionais a calcular no notebook analise_06_06.ipynb
 
-Para análise pós-06/06, o notebook deve gerar:
+Para análise pós-06/07, o notebook deve gerar:
 
 1. PF líquido geral + PF por ativo
 2. PF após remover melhor trade (validação anti-outlier)
@@ -194,18 +194,18 @@ polymarket-bot), causando travamento do sshd em 21/05/2026.
 
 **Justificativa:**
 Garantir recursos exclusivos ao Sistema 1 elimina a variável confusora 
-"memory pressure → execution lag → signal loss" da análise pós-06/06.
+"memory pressure → execution lag → signal loss" da análise pós-06/07.
 A incubação mede edge do Sistema 1 — não capacidade da VM de rodar 3 bots.
 
 **Reativação programada:**
-Polymarket e dashboard serão reativados após 06/06/2026, junto com 
+Polymarket e dashboard serão reativados após 06/07/2026, junto com 
 avaliação de upgrade da VM (candidato: A1.Flex ARM, 24 GB grátis).
 
 **Risco residual aceito:**
 Mesmo com apenas 1 serviço, a VM ainda tem só 1 GB de RAM sem swap. 
 Se houver travamento durante a incubação, o pacto é: registrar o incidente, 
 NÃO mexer no código, fazer reboot via console, e contabilizar o gap no 
-notebook de análise 06/06.
+notebook de análise 06/07.
 
 ---
 
@@ -239,7 +239,7 @@ estava rodando como processo `nohup` solto, não como systemd service.
 Por isso não reiniciou automaticamente após o reboot da VM (comportamento 
 desejado durante a incubação, mas frágil em produção normal).
 
-**Ação programada para pós-06/06/2026 (NÃO FAZER ANTES):**
+**Ação programada para pós-06/07/2026 (NÃO FAZER ANTES):**
 
 1. Criar `trading-ai-observator.service` em `/etc/systemd/system/`
 2. Definir `Restart=on-failure`, `MemoryLimit=200M` (proteção contra OOM)
@@ -249,5 +249,5 @@ desejado durante a incubação, mas frágil em produção normal).
 
 **Por que não fazer agora:**
 Mexer em systemd durante a incubação viola o pacto de congelamento. 
-O observator está corretamente desativado para a janela de 16 dias.
+O observator está corretamente desativado para a janela de 45 dias.
 

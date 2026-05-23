@@ -57,7 +57,7 @@ crontab -l
 
 ---
 
-## Reativação pós-06/06 (executar NA ORDEM)
+## Reativação pós-06/07 (executar NA ORDEM)
 
 ### Passo 1 — Verificar saúde antes de qualquer mudança
 
@@ -204,7 +204,7 @@ grep "NOT executed" ~/trading-ai/scheduler.log | tail -20
 
 ---
 
-## Upgrade da VM (roadmap pós-06/06)
+## Upgrade da VM (roadmap pós-06/07)
 
 ### De VM.Standard.E2.1.Micro para A1.Flex ARM
 

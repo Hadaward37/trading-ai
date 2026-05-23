@@ -1,8 +1,8 @@
 # ⚠️ INCUBAÇÃO ATIVA — leia este bloco antes de qualquer ação
 
 **Data de abertura desta sessão:** verifique a data atual.
-**Se hoje < 06/06/2026:** sistema em congelamento. Siga as regras abaixo.
-**Se hoje >= 06/06/2026:** vá direto para "Próxima ação pós-incubação".
+**Se hoje < 06/07/2026:** sistema em congelamento. Siga as regras abaixo.
+**Se hoje >= 06/07/2026:** vá direto para "Próxima ação pós-incubação".
 
 ## Estado congelado (desde 22/05/2026)
 
@@ -10,7 +10,7 @@
 |---|---|
 | Status | INCUBAÇÃO v1.0 |
 | Início | 2026-05-22 |
-| Revisão obrigatória | **2026-06-06** |
+| Revisão obrigatória | **2026-07-06** |
 | Commit de incubação | `daaa5ca` |
 | Strategy version | `v1.0` |
 | Ativos ativos | VALE3, PETR4, ITUB4, BBDC4 |
@@ -20,16 +20,23 @@
 | Threshold de confiança | 55 (sobre `final_score`) |
 | Comissão paper | 0.05%/lado = 0.10% round-trip |
 
+> **EXTENSÃO DE JANELA (22/05/2026):** janela original era 16 dias (até 06/06/2026).
+> Estendida para 45 dias (até 06/07/2026) por dois motivos:
+> (1) usuário pausou acesso ao Claude por questão de assinatura até 06/07, e
+> (2) janela maior gera amostra estatística mais robusta (estimativa: 30+ trades vs
+> 15 mínimos), eliminando risco do Cenário C (promissor mas poucos trades).
+> **Sistema 1 continua rodando exatamente como está — zero alterações de código/config.**
+
 ## O que está rodando na Oracle (137.131.228.166)
 
 - `trading-ai.service` → **ATIVO** (systemd, Restart=always)
-- `polymarket-bot.service` → PAUSADO (disabled até 06/06)
-- `polymarket-dashboard.service` → PAUSADO (disabled até 06/06)
+- `polymarket-bot.service` → PAUSADO (disabled até 06/07)
+- `polymarket-dashboard.service` → PAUSADO (disabled até 06/07)
 - `trading-ai-observator` → PAUSADO (nohup, não reinicia no boot)
 - Swap: 1 GB em `/swapfile` (ativado em 22/05/2026)
 - Cron: `*/5 * * * *` → `fill_outcomes_job.py`
 
-## Operações PERMITIDAS até 06/06
+## Operações PERMITIDAS até 06/07
 
 ```bash
 # Único SSH autorizado — healthcheck read-only
@@ -39,7 +46,7 @@ ssh -i ~/.ssh/ssh-key-2026-05-05.key ubuntu@137.131.228.166 \
    wc -l ~/trading-ai/logs/signals.jsonl 2>/dev/null || echo "0 sinais"'
 ```
 
-## Próxima ação pós-incubação (06/06/2026)
+## Próxima ação pós-incubação (06/07/2026)
 
 1. `wc -l logs/signals.jsonl` — quantos sinais coletados?
 2. Abrir `notebooks/analise_06_06.ipynb` e rodar todas as células em ordem
@@ -68,7 +75,7 @@ ssh -i ~/.ssh/ssh-key-2026-05-05.key ubuntu@137.131.228.166 \
 
 ## Status atual
 **SISTEMA CONGELADO EM INCUBAÇÃO** desde 2026-05-06.
-Revisão em **2026-06-06**. Até lá: zero alterações em modelo, features, target, thresholds ou filtros.
+Revisão em **2026-07-06**. Até lá: zero alterações em modelo, features, target, thresholds ou filtros.
 
 ## O que o sistema faz
 Bot de trading algorítmico com ML. Gera sinais exportados para MT5 via EA MQL5.
@@ -123,7 +130,7 @@ trading-ai/
 ```
 
 ## Arquivos críticos (não tocar)
-- `core/regime_filter.py` — substituição pelo HMM só pós-06/06
+- `core/regime_filter.py` — substituição pelo HMM só pós-06/07
 - `core/kill_switch.py` — proteção de capital, não alterar
 - `core/signals.py` — thresholds congelados até revisão
 - `data/telemetry.json` — dados ao vivo em acúmulo, não corromper
@@ -132,17 +139,17 @@ trading-ai/
 ## Onde roda
 - **Local**: Windows 11 via `.\venv\Scripts\python` (execução principal)
 - **Oracle VM** (`137.131.228.166`): reservada para Dashboard Mobile (FastAPI porta 8000)
-  - Porta 8000 ainda **não aberta** no firewall OCI — roadmap pós-06/06
+  - Porta 8000 ainda **não aberta** no firewall OCI — roadmap pós-06/07
   - Endpoints planejados: `/candles/recent`, `/features/recent`, `/events/recent`
 - **MT5**: Clear corretora conectada
 
-## Roadmap pós-06/06
+## Roadmap pós-06/07
 1. **Validar incubação** — checar critérios do `PROGRESS.md` com 30 dias de dados ao vivo
 2. **Integrar HMM** — substituir `regime_filter.py` rule-based pelo `HMMRegimeDetector` (holdout conf=95.8%)
 3. **Adaptive Sizing** — B2=1.0x, B3=0.7x, B4=0.3x, B5=0.1x (só ativar se PF rolling > 1.0)
 4. **Dashboard Mobile** — abrir firewall OCI → FastAPI → PWA com Lightweight Charts + regimes coloridos ao vivo
 
-## Regras absolutas até 06/06
+## Regras absolutas até 06/07
 - ❌ Não alterar modelo (LSTM, XGBoost, FinBERT)
 - ❌ Não alterar features ou target
 - ❌ Não alterar thresholds de sinal
@@ -181,5 +188,5 @@ python scripts/fill_outcomes_job.py
 ```
 
 ## Divisão Claude.ai vs Claude Code
-- **Claude.ai**: análise de telemetria 30 dias, decisões de arquitetura pós-06/06, design do HMM integration, estratégia de Dashboard Mobile
+- **Claude.ai**: análise de telemetria 30 dias, decisões de arquitetura pós-06/07, design do HMM integration, estratégia de Dashboard Mobile
 - **Claude Code**: implementação pós-aprovação, scripts de análise read-only, ajustes de infra
