@@ -214,6 +214,8 @@ Converte janela de 20 candles em vetor normalizado L2:
 - volume normalizado pelo mean
 - atr_ratio últimos 5 candles
 
+> **IMPORTANTE:** O ChromaDB do Pythex em produção usa embeddings de 64 dimensões. O vetor retornado por pattern_to_embedding() deve ter exatamente 64 dimensões.
+
 ### Endpoints disponíveis no Pythex
 - POST /auth/token
 - POST /trading/ingest
