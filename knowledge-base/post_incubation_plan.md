@@ -179,3 +179,51 @@ Copiar e preencher após análise:
 **Decisão:** ___
 **Próxima revisão:** ___
 ```
+
+---
+
+## Fase 2 — Integração Pythex × Trading-AI (Gate: 06/07/2026)
+
+### Pré-requisito
+Sistema 1 validado: PF >= 1.2 líquido estável nos 45 dias de incubação.
+
+### O que implementar (app/pythex_client.py)
+Criar cliente HTTP para o Pythex Trading Intelligence Layer:
+- URL: https://api.pythex.com.br
+- Credenciais: PYTHEX_CLIENT_ID e PYTHEX_CLIENT_SECRET no .env
+
+**PythexClient class:**
+- Token JWT lazy com renovação automática (expira em 30 dias)
+- ingest_pattern(ativo, timeframe, embedding, metadata) → id
+- search_similar(ativo, embedding, n_results=10, filters=None) → casos + stats
+- get_stats(ativo) → dict
+
+**get_similarity_features(ativo, embedding) → dict**
+Retorna 5 features para o XGBoost:
+- hist_win_rate
+- hist_avg_ret_1h
+- hist_avg_ret_1d
+- hist_n_casos
+- hist_similarity_max
+
+Se Pythex estiver fora do ar: retorna zeros silenciosamente (não quebra o pipeline).
+
+**pattern_to_embedding(candles_df) → list[float]**
+Converte janela de 20 candles em vetor normalizado L2:
+- retornos pct_change últimos 20 candles
+- volume normalizado pelo mean
+- atr_ratio últimos 5 candles
+
+### Endpoints disponíveis no Pythex
+- POST /auth/token
+- POST /trading/ingest
+- POST /trading/search
+- GET  /trading/stats/{ativo}
+
+### Ordem de execução quando o gate abrir
+1. Adicionar PYTHEX_CLIENT_ID e PYTHEX_CLIENT_SECRET no .env do servidor
+2. Implementar app/pythex_client.py
+3. Testar ingest + search com dados reais do histórico
+4. Adicionar get_similarity_features() no pipeline de features do XGBoost
+5. Rodar backtest comparativo: XGBoost sem vs com features de similaridade
+6. Só ativar em produção se Sharpe melhorar
