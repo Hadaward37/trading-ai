@@ -59,13 +59,13 @@ identificar o cenário abaixo e seguir o protocolo correspondente.
 
 1. NÃO mexer em código (mesma config v1.0)
 2. NÃO reativar serviços auxiliares
-3. Congelamento estende até **22/06/2026**
-4. Criar nova tag: `git tag -a "incubation-v1.0-extended" -m "extended to 22/06"`
+3. Congelamento estende até **06/07/2026**
+4. Criar nova tag: `git tag -a "incubation-v1.0-extended" -m "extended to 06/07"`
 5. Investigação auxiliar (read-only, sem alterar nada):
    - Distribuição de `final_score` nos sinais gerados (incluindo rejeitados)
    - Se > 80% dos scores caem entre 40-55: threshold PODE estar restringindo demais
    - Registrar a hipótese — NÃO testar ainda
-6. Em 22/06: reavaliar com amostra maior
+6. Em 06/07: reavaliar com amostra maior
 
 ---
 
