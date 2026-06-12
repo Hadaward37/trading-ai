@@ -47,6 +47,7 @@ A hipótese é considerada **VÁLIDA** em 06/07 se:
 - [ ] **PF permanece > 1.0 após remover o melhor trade individual** — proteção contra outlier (sugestão GPT)
 - [ ] **Win rate >= 45%** combinado com avg_win > avg_loss
 - [ ] **Edge presente em pelo menos 2 dos 4 ativos** (não pode ser concentrado em 1)
+  - Cada ativo só conta para "edge em 2+ ativos" se tiver **>= 8 trades**. Abaixo disso, o critério é apenas auxiliar (não-vinculante)
 - [ ] **Drawdown máximo <= 5%** sobre capital R$ 10.000 (= R$ 500)
 - [ ] **Mínimo operacional: 15 trades** — abaixo disso, amostra inutilizável
 - [ ] **Mínimo estatístico confortável: 30 trades** — abaixo disso, edge NÃO pode ser declarado robusto, apenas "promissor para continuar pesquisa"
@@ -75,7 +76,12 @@ A hipótese é considerada **INVALIDADA** em 06/07 se:
 
 ## Zona cinza (0.9 <= PF < 1.2)
 
-Não é validação nem invalidação. **Não adicionar features.** Ações permitidas:
+Não é validação nem invalidação. **Não adicionar features.**
+
+**Regra de drawdown (fecha a zona morta entre validação DD <= 5% e invalidação DD > 8%):**
+Se 5% < DD <= 8%, classificar como Cenário D (zona cinza), independente do PF.
+
+Ações permitidas:
 
 1. **Reduzir escopo:** manter apenas o(s) ativo(s) que mostraram PF > 1.0 individual
 2. **Estender incubação:** +30 dias com `strategy_version = v1.1` (apenas mudança de escopo)
@@ -154,6 +160,7 @@ Coisas que NÃO sei se afetam o resultado, mas estou aceitando como tradeoff:
 | Validado base | 1.2 <= PF < 1.5 | >= 30 | Estender incubação +30d, sem mudanças, validar consistência |
 | Promissor (sub-amostra) | PF >= 1.2 | 15 <= n < 30 | **Não declarar edge.** Nova rodada de 30 dias com mesma config |
 | Zona cinza | 0.9 <= PF < 1.2 | qualquer | Reduzir escopo aos ativos que funcionaram + análise regime |
+| Zona cinza (DD) | qualquer | qualquer | Se 5% < DD <= 8% → Cenário D, independente do PF |
 | Invalidado | PF < 0.9 | qualquer | **PIVOT.** Pausar Sistema 1. Analisar dataset. Considerar nova hipótese |
 | Operacionalmente inviável | qualquer | qualquer | Arquivar sistema atual, considerar reescrita do zero |
 

@@ -12,7 +12,7 @@
 - Ernest Chan — Algorithmic Trading
 - Edward Thorp — A Man for All Markets
 
-## Técnicas a implementar pós 06/06
+## Técnicas a implementar pós 06/07
 - Fractional Differentiation (d≈0.35)
 - Triple Barrier Method
 - Purged K-Fold CV

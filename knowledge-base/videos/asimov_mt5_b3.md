@@ -40,7 +40,7 @@ df_ticks['time'] = pd.to_datetime(df_ticks['time'], unit='s')
 - pd.to_datetime(..., unit='s') obrigatório
 - Credenciais em arquivo separado
 
-## Relevância pós 06/06
+## Relevância pós 06/07
 - Substituir yfinance por MT5 no Sistema 1
 - Dados reais B3: PETR4, VALE3, ITUB4, WIN, WDO
 - Tick data para Dollar Bars (López de Prado)

@@ -11,7 +11,7 @@
 
 Ler **apenas** se TODAS as condições abaixo forem verdadeiras:
 
-1. ✅ Milestone 06/06/2026 concluído
+1. ✅ Milestone 06/07/2026 concluído
 2. ✅ Telemetria de 30 dias da incubação analisada
 3. ✅ Adaptive Sizing implementado e validado em paper trading
 4. ✅ Historical Similarity Engine (Sistema 2) funcionando com Pythex como vector base

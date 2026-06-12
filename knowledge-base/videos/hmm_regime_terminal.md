@@ -36,7 +36,7 @@ Etapa 2: Só entra se regime correto + 7/8 confirmações técnicas
 - Implementar Signal Hysteresis no Observer
 - 7 estados de regime (igual ao vídeo)
 
-## Relevância pós 06/06
+## Relevância pós 06/07
 - Prioridade 3 no roadmap
 - Após: validação Sistema 1 + Adaptive Sizing
 - Substituir regime classifier v3 atual por HMM

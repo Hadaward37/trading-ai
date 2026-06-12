@@ -43,11 +43,11 @@ identificar o cenário abaixo e seguir o protocolo correspondente.
 
 **Decisão:** Mais paper trading antes do live.
 
-1. Estender paper trading por +30 dias (até 06/07/2026)
+1. Estender paper trading por +30 dias a partir de 06/07/2026 (até 05/08/2026)
 2. NÃO ir live ainda
 3. Migrar VM A1.Flex (infra é seguro fazer agora)
 4. Reativar observator filtrado (monitoramento, sem trade)
-5. Em 06/07: reavaliar com 60+ trades acumulados
+5. Em 05/08/2026: reavaliar com 60+ trades acumulados
 6. Se mantiver PF >= 1.2 → seguir CENÁRIO A
 7. Se cair < 1.2 → tratar como zona cinza (CENÁRIO D)
 
@@ -55,17 +55,17 @@ identificar o cenário abaixo e seguir o protocolo correspondente.
 
 ## CENÁRIO C — Promissor, amostra pequena (PF >= 1.2, n < 30 trades)
 
-**Decisão:** Estender incubação por mais 16 dias.
+**Decisão:** Estender incubação por +30 dias a partir de 06/07/2026 (mesma config), alinhado ao Cenário B.
 
 1. NÃO mexer em código (mesma config v1.0)
 2. NÃO reativar serviços auxiliares
-3. Congelamento estende até **06/07/2026**
-4. Criar nova tag: `git tag -a "incubation-v1.0-extended" -m "extended to 06/07"`
+3. Congelamento estende por +30 dias a partir de 06/07/2026 (até **05/08/2026**)
+4. Criar nova tag: `git tag -a "incubation-v1.0-extended" -m "extended +30d to 05/08/2026"`
 5. Investigação auxiliar (read-only, sem alterar nada):
    - Distribuição de `final_score` nos sinais gerados (incluindo rejeitados)
    - Se > 80% dos scores caem entre 40-55: threshold PODE estar restringindo demais
    - Registrar a hipótese — NÃO testar ainda
-6. Em 06/07: reavaliar com amostra maior
+6. Em 05/08/2026: reavaliar com amostra maior
 
 ---
 
