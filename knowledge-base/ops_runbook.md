@@ -204,17 +204,69 @@ grep "NOT executed" ~/trading-ai/scheduler.log | tail -20
 
 ---
 
-## Upgrade da VM (roadmap pós-06/07)
+## Migração para A1.Flex ARM (13/06/2026 — CORRIGIDO)
 
-### De VM.Standard.E2.1.Micro para A1.Flex ARM
+> ⚠️ **NÃO é "Change Shape".** A VM atual é E2.1.Micro **x86_64**; A1.Flex é
+> **ARM (aarch64)**. Oracle não troca arquitetura in-place (o boot volume x86
+> não dá boot em ARM, e o A1.Flex nem aparece no "Edit shape" de uma instância
+> x86). **É criar uma instância nova ARM e migrar.**
+>
+> Motivo da migração: rodar o ensemble ML (tensorflow/LSTM) que não cabe em 1GB.
+> Ver `knowledge-base/incident_20260613.md`.
 
-1. Oracle Cloud Console → Compute → Instances → Stop instance
-2. Change shape → VM.Standard.A1.Flex → 2 OCPU / 12 GB RAM (grátis no Always Free)
-3. Start instance
-4. Verificar que IP público não mudou (ou atualizar DNS)
-5. SSH e confirmar `free -h` mostra ~12 GB
-6. `sudo swapon --show` — swap ainda ativo (manter, não prejudica)
-7. Reativar polymarket e observator com MemoryLimit no unit file
+### Parte A — no Console OCI (só o usuário faz)
+1. Compute → Instances → Create instance
+2. Shape: **VM.Standard.A1.Flex** (Ampere). Always Free: até 4 OCPU / 24 GB.
+   - ⚠️ A1 free vive dando "Out of capacity" — pode precisar tentar outro AD/horário.
+3. Image: **Ubuntu 22.04 (aarch64/ARM)**
+4. Mesma VCN/subnet; **mesma chave SSH pública** (`ssh-key-2026-05-05.key`)
+5. IP: a nova instância vem com IP novo. Opção simples: usar o IP novo e
+   atualizar este runbook. (O 137.131.228.166 é ephemeral da instância antiga.)
+6. Anotar o IP público novo e me passar.
+
+### Parte B — setup do servidor (eu faço via SSH, com o IP novo)
+```bash
+sudo apt update && sudo apt install -y python3-venv python3-dev build-essential git
+cd ~ && git clone https://github.com/Hadaward37/trading-ai.git
+cd trading-ai && python3 -m venv venv
+./venv/bin/pip install -U pip wheel
+./venv/bin/pip install -r requirements.txt      # agora inclui tensorflow/joblib/sklearn
+mkdir -p logs backups
+```
+Depois, do local, enviar segredos + modelos + histórico:
+```powershell
+$ip = "<IP_NOVO>"
+scp -i $key .env ubuntu@${ip}:~/trading-ai/.env
+scp -i $key models/lstm_eurusd_1h.h5 models/lstm_scaler.pkl `
+            models/xgboost_eurusd.pkl models/xgboost_scaler.pkl ubuntu@${ip}:~/trading-ai/models/
+scp -i $key data/trading.db ubuntu@${ip}:~/trading-ai/data/   # opcional: preservar histórico
+```
+Recriar systemd unit (`/etc/systemd/system/trading-ai.service`, ExecStart=
+`venv/bin/python run_scheduler.py`, Restart=always) e crontab:
+```cron
+*/5 * * * * cd /home/ubuntu/trading-ai && /home/ubuntu/trading-ai/venv/bin/python scripts/fill_outcomes_job.py >> /home/ubuntu/trading-ai/logs/outcome_filler.log 2>&1
+# Backup CORRIGIDO (o antigo copiava signals.jsonl que não existe — pipeline usa SQLite):
+0 3 * * * cp /home/ubuntu/trading-ai/data/trading.db /home/ubuntu/backups/trading_$(date +\%Y\%m\%d).db 2>>/home/ubuntu/trading-ai/logs/backup.log
+```
+
+### Parte C — verificar
+```bash
+sudo systemctl restart trading-ai.service && sleep 85
+grep -iE 'lstm|xgboost' scheduler.log | tail   # NÃO deve dizer "not found"/"No module"
+grep -E 'EUR/USD|signals_1h' scheduler.log | tail
+```
+LSTM e XGBoost devem carregar; com o cérebro vivo o portão de consenso passa a
+deixar sinais reais (BUY/SELL) quando as condições baterem. Confirmar
+`Saved ... signals_1h` com datetime recente.
+
+### Parte D — desligar a instância antiga
+Só **depois** de validar a nova. Stop (não terminate) a E2.1.Micro por alguns
+dias como fallback. Atualizar IP neste runbook e no CLAUDE.md.
+
+> **Compat Keras:** o `lstm_eurusd_1h.h5` foi salvo em Keras 2; tensorflow>=2.16
+> usa Keras 3 e pode falhar ao carregar `.h5` legado. Se acontecer:
+> `./venv/bin/pip install tf-keras` e/ou setar `TF_USE_LEGACY_KERAS=1`, ou
+> retreinar o LSTM na VM nova (24GB aguenta). Resolver no passo de verificação.
 
 ---
 
