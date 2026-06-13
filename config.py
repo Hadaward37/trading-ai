@@ -33,13 +33,19 @@ DEFAULT_TF  = "1h"
 DB_PATH     = ROOT_DIR / "data" / "trading.db"
 
 # ── Multi-asset universe ──────────────────────────────────────────────────────
+# 2026-06-13: voltado para EUR/USD para VALIDAÇÃO DE EDGE.
+# Motivo: a incubação B3 (22/05-13/06) nunca gerou dados — o cérebro
+# (LSTM+XGBoost) e o edge validado (PF 1.432) são de EUR/USD, e o backtest
+# mostrou B3 frágil (PF~1.03, robustez FRÁGIL). Ver knowledge-base/incident_20260613.md.
+# Religar EUR/USD destrava a persistência (save_signals é gated em config.SYMBOL).
 ASSETS: dict[str, str] = {
-    "VALE3":   "VALE3.SA",
-    "PETR4":   "PETR4.SA",
-    "ITUB4":   "ITUB4.SA",
-    "BBDC4":   "BBDC4.SA",
-    "IBOV":    "^BVSP",
+    "EURUSD": "EURUSD=X",
 }
+
+# Universo B3 — DESATIVADO em 2026-06-13 (sem modelo B3 + edge frágil no backtest).
+# Restaurar só após treinar modelos B3 + migração de schema (signals_1h precisa de coluna symbol):
+# ASSETS = {"VALE3": "VALE3.SA", "PETR4": "PETR4.SA", "ITUB4": "ITUB4.SA",
+#           "BBDC4": "BBDC4.SA", "IBOV": "^BVSP"}
 
 # Ativos usados apenas como benchmark (sinais são logados, mas NÃO geram trades no paper portfolio)
 BENCHMARK_ASSETS: set[str] = {"IBOV"}

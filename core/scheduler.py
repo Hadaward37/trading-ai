@@ -27,7 +27,7 @@ if str(_ROOT) not in sys.path:
 import config
 from core.backtest import run_backtest
 from core.collector import fetch_ohlcv
-from core.healthcheck import heartbeat, start_healthcheck
+from core.healthcheck import check_signal_freshness, heartbeat, start_healthcheck
 from core.indicators import add_all_indicators
 from core.news_filter import is_danger_zone
 from core.notifier import SignalAlert, TelegramNotifier
@@ -457,6 +457,7 @@ def run_scheduler() -> None:
             if _last_journal_date != today and portfolio:
                 print_daily_summary()
                 export_daily_csv()
+                check_signal_freshness(config.SCHEDULER_TIMEFRAME)
                 _last_journal_date = today
 
         except KeyboardInterrupt:

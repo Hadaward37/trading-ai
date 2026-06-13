@@ -1,31 +1,40 @@
-# ⚠️ INCUBAÇÃO ATIVA — leia este bloco antes de qualquer ação
+# ⚠️ INCUBAÇÃO B3 INVALIDADA — VALIDAÇÃO EUR/USD EM CURSO (desde 13/06/2026)
 
-**Data de abertura desta sessão:** verifique a data atual.
-**Se hoje < 06/07/2026:** sistema em congelamento. Siga as regras abaixo.
-**Se hoje >= 06/07/2026:** vá direto para "Próxima ação pós-incubação".
+> **LEIA `knowledge-base/incident_20260613.md` ANTES DE QUALQUER AÇÃO.**
+>
+> A incubação B3 (22/05→13/06) **nunca coletou dados**: o scheduler rodava mas
+> produzia HOLD puro em todos os ativos B3, e a persistência (`save_signals`)
+> estava gated em EUR/USD (`config.SYMBOL`), que tinha sido removido do universo.
+> 23 dias = zero sinais/trades B3. **A premissa "esperar até 06/07" morreu — não
+> havia experimento vivo.** O freeze antigo abaixo está OBSOLETO.
 
-## Estado congelado (desde 22/05/2026)
+## Estado atual (desde 13/06/2026)
 
 | Item | Valor |
 |---|---|
-| Status | INCUBAÇÃO v1.0 |
-| Início | 2026-05-22 |
-| Revisão obrigatória | **2026-07-06** |
-| Commit de incubação | `daaa5ca` |
-| Strategy version | `v1.0` |
-| Ativos ativos | VALE3, PETR4, ITUB4, BBDC4 |
-| Benchmark (sem trades) | IBOV |
-| EUR/USD | REMOVIDO do universo |
-| Sentimento LLM | DESATIVADO |
-| Threshold de confiança | 55 (sobre `final_score`) |
+| Status | VALIDAÇÃO DE EDGE — EUR/USD |
+| Decisão | Validar onde o cérebro e o edge existem (EUR/USD); B3 não tem modelo e o backtest deu edge FRÁGIL (PF~1.03) |
+| Ativo ativo | **EUR/USD** (`EURUSD=X`) |
+| B3 | DESATIVADO em `config.py` (preservado em comentário p/ restauro) |
+| Modelos | `lstm_eurusd_1h.h5` + `xgboost_eurusd.pkl` (existem só p/ EUR/USD) |
+| Threshold de confiança | 55 (sobre `final_score`, escala 0-100) |
 | Comissão paper | 0.05%/lado = 0.10% round-trip |
+| Plano de capital | Demo só **depois** de validar o edge; B3 era preferência operacional, não restrição |
+| Próximo passo se validar | port para B3 exige treinar modelos B3 + migração de schema (`signals_1h` sem coluna `symbol`) |
 
-> **EXTENSÃO DE JANELA (22/05/2026):** janela original era 16 dias (até 06/06/2026).
-> Estendida para 45 dias (até 06/07/2026) por dois motivos:
-> (1) usuário pausou acesso ao Claude por questão de assinatura até 06/07, e
-> (2) janela maior gera amostra estatística mais robusta (estimativa: 30+ trades vs
-> 15 mínimos), eliminando risco do Cenário C (promissor mas poucos trades).
-> **Sistema 1 continua rodando exatamente como está — zero alterações de código/config.**
+> **Healthcheck novo (13/06):** `check_signal_freshness()` alerta no Telegram se
+> `signals_1h` congelar >72h — a instrumentação que teria pego o bug em 22/05.
+
+---
+
+<details><summary>Histórico: bloco de incubação B3 (OBSOLETO — mantido para contexto)</summary>
+
+**Estado congelado (22/05/2026 → invalidado em 13/06/2026):** INCUBAÇÃO v1.0,
+ativos VALE3/PETR4/ITUB4/BBDC4, IBOV benchmark, EUR/USD removido, revisão
+agendada p/ 06/07. Janela estendida de 16→45 dias em 22/05. Tudo isso caiu com
+o diagnóstico de 13/06 (ver incident_20260613.md).
+
+</details>
 
 ## O que está rodando na Oracle (137.131.228.166)
 

@@ -66,6 +66,55 @@ def _check_loop() -> None:
         time.sleep(CHECK_INTERVAL_SEC)
 
 
+_last_freshness_alert: Optional[datetime] = None
+
+# 72h cobre fim de semana de forex (sexta→segunda ~65h) sem falso positivo,
+# e ainda pega o modo de falha catastrófico: tabela congelada por dias/semanas.
+SIGNAL_STALE_HOURS = 72
+
+
+def check_signal_freshness(timeframe: str = "1h") -> None:
+    """Alerta no Telegram se ``signals_<tf>`` parou de ser gravado.
+
+    Pega a falha de 2026-05-21: scheduler vivo (heartbeat OK) mas ``save_signals``
+    nunca executava, deixando a tabela congelada silenciosamente. Chamar uma vez
+    por dia (bloco diário do scheduler). Cooldown de 24h entre alertas.
+    """
+    global _last_freshness_alert
+    try:
+        from db.database import last_signal_timestamp
+
+        last = last_signal_timestamp(timeframe)
+        now = datetime.now(timezone.utc)
+
+        if last is None:
+            msg = f"⚠️ ALERTA: tabela signals_{timeframe} ausente ou vazia — persistência não está gravando."
+        else:
+            last_utc = last.tz_localize("UTC") if last.tzinfo is None else last.tz_convert("UTC")
+            age_h = (now - last_utc).total_seconds() / 3600
+            if age_h <= SIGNAL_STALE_HOURS:
+                return  # fresco — nada a fazer
+            msg = (
+                f"⚠️ ALERTA: signals_{timeframe} congelado há {age_h:.0f}h\n"
+                f"Último registro: {last_utc.isoformat()}\n"
+                f"Persistência pode ter parado (vivo mas sem gravar)."
+            )
+
+        cooldown_ok = (
+            _last_freshness_alert is None
+            or now - _last_freshness_alert > timedelta(hours=24)
+        )
+        if cooldown_ok:
+            try:
+                _get_notifier().send_text(msg)
+            except Exception as exc:
+                logger.error("[healthcheck] freshness alert failed: %s", exc)
+            _last_freshness_alert = now
+            logger.warning("[healthcheck] %s", msg.replace("\n", " | "))
+    except Exception as exc:
+        logger.warning("[healthcheck] freshness check error: %s", exc)
+
+
 def start_healthcheck() -> Thread:
     """Start the background monitoring thread. Safe to call multiple times."""
     t = Thread(target=_check_loop, daemon=True, name="healthcheck")

@@ -84,3 +84,23 @@ def load_signals(
     except Exception as exc:
         logger.warning("Table '%s' not found: %s", table, exc)
         return None
+
+
+def last_signal_timestamp(
+    timeframe: str, db_path: Optional[Path] = None
+) -> Optional[pd.Timestamp]:
+    """Return MAX(datetime) from ``signals_<timeframe>`` or ``None`` if absent.
+
+    Note: ``save_signals`` uses ``if_exists='replace'``, so the table is a
+    snapshot of the latest fetch — a *stale* MAX(datetime) means persistence
+    has silently stopped (the failure mode that froze the table on 2026-05-21).
+    """
+    eng = _engine(db_path)
+    table = f"signals_{timeframe}"
+    try:
+        df = pd.read_sql(f'SELECT MAX(datetime) AS ts FROM "{table}"', con=eng)
+        ts = df["ts"].iloc[0]
+        return pd.to_datetime(ts) if ts is not None else None
+    except Exception as exc:
+        logger.warning("Could not read MAX(datetime) from '%s': %s", table, exc)
+        return None
