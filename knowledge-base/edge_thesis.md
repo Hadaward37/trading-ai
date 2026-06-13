@@ -29,13 +29,14 @@ alguns terão edge, outros não. A análise deve segmentar por ativo."
 | Timeframe | 15min |
 | Sentimento LLM | DESATIVADO (peso = 0) |
 | Modelo ML | XGBoost (LSTM ausente, ensemble degradado — aceito) |
-| Threshold confiança inicial | 0.65 |
-| Threshold fallback | 0.55 (se <5 trades em 7 dias corridos) |
+| Threshold de confiança | **55** (escala 0-100, sobre `final_score`) ¹ |
 | Custo simulado por trade | 0.05% (ida) + 0.05% (volta) = 0.10% round-trip |
 | Capital paper trading | R$ 10.000 |
 | Sizing | Fixo (sem adaptive sizing nesta fase) |
 | Período de incubação | 22/05/2026 → 06/07/2026 |
 | Janelas de outcome | 5min, 30min, 1h, 4h, 1d |
+
+> ¹ **Correção 13/06/2026:** os valores "0.65 inicial / 0.55 fallback" registrados aqui eram de uma escala antiga (0-1) e nunca foram os valores em runtime. O `config.py:161` usa `SIGNAL_CONFIDENCE_THRESHOLD = 55` na escala 0-100 do `final_score`, sem mecanismo de fallback implementado. Era o "bug 2.3" da revisão Fable 5 — resolvido. Ver `incident_20260613.md`.
 
 ---
 
@@ -148,7 +149,7 @@ Coisas que NÃO sei se afetam o resultado, mas estou aceitando como tradeoff:
 2. **Custo de 0.05% é estimativa conservadora** — corretagem Clear é zero para day trade em ações, mas há emolumentos B3 (~0.0325%) + ISS + slippage estimado
 3. **Paper trading não simula impacto de mercado** — irrelevante em PETR4/VALE3/ITUB4/BBDC4 com 100 ações
 4. **XGBoost solo (sem LSTM)** — ensemble degradado, aceito porque trocar componente durante incubação invalidaria amostra
-5. **Threshold 0.65 pode ser apertado demais** — fallback para 0.55 mitiga, mas se não disparar, amostra pode ficar pequena
+5. **Threshold = 55 (escala 0-100)** — se não disparar, amostra pode ficar pequena (não há fallback implementado; ver correção na tabela acima)
 
 ---
 
