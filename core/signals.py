@@ -219,6 +219,20 @@ def generate_signals_custom(
         # SELL valid only if both models bearish (<50)
         df.loc[sell_mask & ~((lstm_prob < 50) & (xgb_prob < 50)), "signal"] = 0
 
+    # Regime filter (ADX + atr_ratio): gate validado do edge (net PF 1.33).
+    # Suprime sinais fora de ADX<max e atr_ratio in (min,max). Mesma lógica do
+    # backtest (scripts/compare_strategy_variants.py) — fonte única de verdade.
+    if getattr(config, "REGIME_FILTER_ENABLED", False):
+        _atr = df["atr"]
+        _atr_ratio = (_atr / _atr.rolling(50).mean()).fillna(0.0)
+        df["atr_ratio"] = _atr_ratio.round(4)
+        _regime_ok = (
+            (df["adx"]   <  getattr(config, "REGIME_FILTER_ADX_MAX", 35.0)) &
+            (_atr_ratio  >  getattr(config, "REGIME_FILTER_ATR_MIN", 0.8)) &
+            (_atr_ratio  <  getattr(config, "REGIME_FILTER_ATR_MAX", 1.5))
+        )
+        df.loc[~_regime_ok, "signal"] = 0
+
     df["ensemble_consensus"] = (
         ((df["signal"] ==  1) & (lstm_prob > 50) & (xgb_prob > 50)) |
         ((df["signal"] == -1) & (lstm_prob < 50) & (xgb_prob < 50)) |

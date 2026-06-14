@@ -94,6 +94,14 @@ REGIME_ADX_RANGE            = 20    # ADX <  this -> range
 REGIME_VOLATILITY_THRESHOLD = 1.5   # ATR / ATR_50ma above this -> high vol
 REGIME_BLOCK_RANGE_SIGNALS  = True  # suppress BUY/SELL entries during Range
 
+# ── Regime filter (v1.2) — gate validado do edge (ADX + atr_ratio) ───────────
+# Aplicado em signals.generate_signals_custom. No backtest (2 anos EUR/USD) este
+# filtro + consenso dá net PF 1.33; sem ele cai p/ ~1.0. atr_ratio = atr/atr_50ma.
+REGIME_FILTER_ENABLED  = True
+REGIME_FILTER_ADX_MAX  = 35.0   # opera só com ADX < 35 (evita tendência forte)
+REGIME_FILTER_ATR_MIN  = 0.8    # opera só com atr_ratio > 0.8
+REGIME_FILTER_ATR_MAX  = 1.5    # opera só com atr_ratio < 1.5 (evita vol anormal)
+
 # ── Multi-Timeframe ───────────────────────────────────────────────────────────
 MTF_MIN_AGREEMENTS = 2   # number of TFs that must agree for a valid MTF signal
 
@@ -108,10 +116,10 @@ SCORE_WEIGHT_LSTM     = 20   # LSTM neural net — directional probability
 SCORE_WEIGHT_XGBOOST  = 21   # XGBoost ensemble — directional probability
 
 # ── LSTM model ────────────────────────────────────────────────────────────────
-# 2026-06-14: DESLIGADO no stopgap v1.1 — a VM de 1GB não roda tensorflow.
-# Com LSTM off, _get_lstm_prob retorna 50 (neutro) sem importar TF.
-# Reativar quando migrar para A1.Flex. Ver incident_20260613.md.
-LSTM_ENABLED     = False
+# 2026-06-14 (v1.2): REATIVADO. Roda via ONNX na VM de 1GB (sem tensorflow) —
+# core/lstm_model.py escolhe backend ONNX quando TF ausente. O consenso é
+# essencial ao edge (net PF 1.33 vs 0.96 sem LSTM). Ver incident_20260613.md.
+LSTM_ENABLED     = True
 LSTM_LOOKBACK    = 60    # candles fed to the network
 LSTM_MODEL_PATH  = "models/lstm_eurusd_1h.h5"
 LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
@@ -119,7 +127,7 @@ LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
 # ── XGBoost ensemble ──────────────────────────────────────────────────────────
 XGBOOST_ENABLED      = True
 XGBOOST_MODEL_PATH   = "models/xgboost_eurusd.pkl"
-XGBOOST_REQUIRE_CONSENSUS = False  # v1.1 stopgap: LSTM off → consenso zeraria tudo (50 não é >50). Reativar com LSTM no A1.Flex.
+XGBOOST_REQUIRE_CONSENSUS = True   # v1.2: reativado — LSTM (ONNX) + XGBoost devem concordar. É o gate que cria o edge.
 
 # ── FinBERT NLP sentiment ─────────────────────────────────────────────────────
 FINBERT_ENABLED = True
@@ -162,16 +170,19 @@ PAPER_TRADING_CAPITAL = 10_000.0   # capital inicial em R$/USD
 
 # Custos de transação aplicados no paper trading
 # 0.05% por lado = 0.10% round-trip (cobre emolumentos B3 + ISS + slippage estimado)
-PAPER_TRADING_COMMISSION_PCT = 0.0005  # 0.05% por lado
+PAPER_TRADING_COMMISSION_PCT = 0.0001  # v1.2: 0.01%/lado = 0.02% round-trip (realista p/ EUR/USD; o 0.05% era de ações B3)
 
 # Threshold mínimo de confiança (escala 0-100, mesmo do final_score)
-# Sinais com final_score >= threshold geram trade
-# Sinais com final_score < threshold são LOGADOS mas NÃO executam trade
-SIGNAL_CONFIDENCE_THRESHOLD = 55
+# v1.2: baixado para 0. O gate real do edge é consenso (LSTM+XGBoost) + filtro
+# de regime — NÃO o final_score (cujo máximo real é ~45, então 55 zerava tudo).
+# A config validada (net PF 1.33) não usa gate de final_score. Adicionar piso
+# de convicção depois se os sinais vierem frequentes demais.
+SIGNAL_CONFIDENCE_THRESHOLD = 0
 
-# Versionamento da estratégia. v1.1 (2026-06-14): stopgap EUR/USD XGBoost-only
-# (LSTM off, consenso off) na VM de 1GB. Dados v1.1 NÃO se misturam com v1.0 na análise.
-STRATEGY_VERSION = "v1.1"
+# Versionamento da estratégia. v1.2 (2026-06-14): estratégia VALIDADA ao vivo —
+# EUR/USD, LSTM(ONNX)+XGBoost+consenso, filtro de regime, threshold 0, comissão forex.
+# Primeira config que de fato implementa o edge validado (net PF 1.33 no backtest).
+STRATEGY_VERSION = "v1.2"
 
 # ── News Intelligence — Phase 2 (Gemini + GPT-4o) ────────────────────────────
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
