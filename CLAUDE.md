@@ -12,11 +12,13 @@
 
 | Item | Valor |
 |---|---|
-| Status | VALIDAÇÃO DE EDGE — EUR/USD |
+| Status | VALIDAÇÃO DE EDGE — EUR/USD — **stopgap v1.1 NO AR (14/06)** |
+| Estratégia rodando | **v1.1**: XGBoost-only (LSTM off, consenso off). VM de 1GB não roda tensorflow |
 | Decisão | Validar onde o cérebro e o edge existem (EUR/USD); B3 não tem modelo e o backtest deu edge FRÁGIL (PF~1.03) |
 | Ativo ativo | **EUR/USD** (`EURUSD=X`) |
 | B3 | DESATIVADO em `config.py` (preservado em comentário p/ restauro) |
-| Modelos | `lstm_eurusd_1h.h5` + `xgboost_eurusd.pkl` (existem só p/ EUR/USD) |
+| Cérebro na VM | XGBoost ✅ (xgb_prob real, ex: 44.9) \| LSTM ❌ (precisa TF → A1.Flex) |
+| Próximo p/ v1.0 puro | migrar A1.Flex (Python 3.11+, TF) → reativar LSTM + `XGBOOST_REQUIRE_CONSENSUS` |
 | Threshold de confiança | 55 (sobre `final_score`, escala 0-100) |
 | Comissão paper | 0.05%/lado = 0.10% round-trip |
 | Plano de capital | Demo só **depois** de validar o edge; B3 era preferência operacional, não restrição |
