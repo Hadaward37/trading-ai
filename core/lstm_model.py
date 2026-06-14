@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 LOOKBACK   = 60
 MODEL_PATH  = _ROOT / "models" / "lstm_eurusd_1h.h5"
+ONNX_PATH   = _ROOT / "models" / "lstm_eurusd_1h.onnx"   # backend leve p/ VM sem TF
 SCALER_PATH = _ROOT / "models" / "lstm_scaler.pkl"
 
 FEATURES = [
@@ -121,29 +122,68 @@ def load_scaler():
         return None
 
 
+def load_onnx_session():
+    """Load ONNX inference session (lightweight, no tensorflow). None if absent."""
+    if not ONNX_PATH.exists():
+        return None
+    try:
+        import onnxruntime as ort
+        sess = ort.InferenceSession(str(ONNX_PATH), providers=["CPUExecutionProvider"])
+        logger.info("LSTM ONNX session loaded from %s", ONNX_PATH)
+        return sess
+    except Exception as exc:
+        logger.warning("Failed to load LSTM ONNX session: %s", exc)
+        return None
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 # Module-level cache (loaded once per process)
-_model  = None
-_scaler = None
-_loaded = False
+_model   = None      # Keras model (quando TF disponível)
+_session = None      # ONNX session (quando TF ausente — ex: VM 1GB)
+_in_name = None      # nome do input ONNX
+_scaler  = None
+_loaded  = False
+_backend = None      # "keras" | "onnx" | None
 
 
 def _ensure_loaded() -> bool:
-    global _model, _scaler, _loaded
+    """Carrega o backend: Keras se houver tensorflow (fonte de verdade local),
+    senão ONNX (leve, p/ VM sem TF). Cacheado por processo."""
+    global _model, _session, _in_name, _scaler, _loaded, _backend
     if _loaded:
-        return _model is not None
-    _model  = load_model()
+        return _backend is not None
+
     _scaler = load_scaler()
+
+    tf_available = True
+    try:
+        import tensorflow  # noqa: F401
+    except Exception:
+        tf_available = False
+
+    if tf_available:
+        _model = load_model()
+        if _model is not None:
+            _backend = "keras"
+
+    if _backend is None:   # sem TF ou Keras falhou → tenta ONNX
+        _session = load_onnx_session()
+        if _session is not None:
+            _in_name = _session.get_inputs()[0].name
+            _backend = "onnx"
+
     _loaded = True
-    return _model is not None
+    if _backend:
+        logger.info("LSTM backend: %s", _backend)
+    return _backend is not None
 
 
 def predict(df: pd.DataFrame) -> float:
     """Return probability of next-candle UP move as 0-100.
 
-    Falls back to 50.0 (neutral) if the model is not available or data
-    is insufficient.
+    Usa Keras ou ONNX (o que estiver disponível). Falls back to 50.0 (neutral)
+    if no backend is available or data is insufficient.
     """
     if not _ensure_loaded():
         return 50.0
@@ -157,10 +197,13 @@ def predict(df: pd.DataFrame) -> float:
             feats = _scaler.transform(feats)
 
         # Take the last LOOKBACK rows
-        window = feats[-LOOKBACK:]
+        window = feats[-LOOKBACK:].astype(np.float32)
         X = window.reshape(1, LOOKBACK, N_FEATURES)
 
-        prob = float(_model.predict(X, verbose=0)[0][0])
+        if _backend == "onnx":
+            prob = float(_session.run(None, {_in_name: X})[0].ravel()[0])
+        else:
+            prob = float(_model.predict(X, verbose=0)[0][0])
         return round(prob * 100, 1)
 
     except Exception as exc:
@@ -170,5 +213,8 @@ def predict(df: pd.DataFrame) -> float:
 
 def invalidate_cache() -> None:
     """Force reload on next predict() call (used after retraining)."""
-    global _loaded
+    global _loaded, _backend, _model, _session
     _loaded = False
+    _backend = None
+    _model = None
+    _session = None
