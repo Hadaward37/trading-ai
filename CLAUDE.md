@@ -12,17 +12,19 @@
 
 | Item | Valor |
 |---|---|
-| Status | VALIDAÇÃO DE EDGE — EUR/USD — **stopgap v1.1 NO AR (14/06)** |
-| Estratégia rodando | **v1.1**: XGBoost-only (LSTM off, consenso off). VM de 1GB não roda tensorflow |
-| Decisão | Validar onde o cérebro e o edge existem (EUR/USD); B3 não tem modelo e o backtest deu edge FRÁGIL (PF~1.03) |
+| Status | **v1.2 NO AR (14/06)** — estratégia VALIDADA operando EUR/USD |
+| Estratégia rodando | **v1.2**: LSTM(ONNX)+XGBoost+consenso + filtro de regime. Edge: net PF 1.33 (backtest 2 anos) |
+| Decisão | Validar onde o cérebro e o edge existem (EUR/USD); B3 sem modelo + edge FRÁGIL (PF~1.03) |
 | Ativo ativo | **EUR/USD** (`EURUSD=X`) |
 | B3 | DESATIVADO em `config.py` (preservado em comentário p/ restauro) |
-| Cérebro na VM | XGBoost ✅ (xgb_prob real, ex: 44.9) \| LSTM ❌ (precisa TF → A1.Flex) |
-| Próximo p/ v1.0 puro | migrar A1.Flex (Python 3.11+, TF) → reativar LSTM + `XGBOOST_REQUIRE_CONSENSUS` |
-| Threshold de confiança | 55 (sobre `final_score`, escala 0-100) |
-| Comissão paper | 0.05%/lado = 0.10% round-trip |
-| Plano de capital | Demo só **depois** de validar o edge; B3 era preferência operacional, não restrição |
-| Próximo passo se validar | port para B3 exige treinar modelos B3 + migração de schema (`signals_1h` sem coluna `symbol`) |
+| Cérebro na VM | XGBoost ✅ + LSTM via **ONNX** ✅ (onnxruntime, sem TF, cabe em 1GB; log "LSTM backend: onnx") |
+| A1.Flex | NÃO é mais necessária — ONNX resolveu. (Útil só se quiser TF/retreino na própria VM) |
+| Threshold de confiança | **0** (gate real = consenso + filtro de regime, não o `final_score` que nunca passa de ~45) |
+| Comissão paper | 0.01%/lado = **0.02% round-trip** (realista p/ EUR/USD) |
+| Filtro de regime | ATIVO no `signals.py` (ADX<35, atr_ratio 0.8-1.5) — antes nunca era aplicado ao vivo |
+| Plano de capital | Demo só **depois** de confirmar o edge ao vivo; sem dinheiro real até lá |
+| O que observar | 1ª leva de trades quando o forex reabrir (segunda). Comparar PnL real vs PF 1.33 esperado |
+| Se quiser B3 | exige treinar modelos B3 + migração de schema (`signals_1h` sem coluna `symbol`) — edge B3 é fraco |
 
 > **Healthcheck novo (13/06):** `check_signal_freshness()` alerta no Telegram se
 > `signals_1h` congelar >72h — a instrumentação que teria pego o bug em 22/05.
