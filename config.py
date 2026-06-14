@@ -108,7 +108,10 @@ SCORE_WEIGHT_LSTM     = 20   # LSTM neural net — directional probability
 SCORE_WEIGHT_XGBOOST  = 21   # XGBoost ensemble — directional probability
 
 # ── LSTM model ────────────────────────────────────────────────────────────────
-LSTM_ENABLED     = True
+# 2026-06-14: DESLIGADO no stopgap v1.1 — a VM de 1GB não roda tensorflow.
+# Com LSTM off, _get_lstm_prob retorna 50 (neutro) sem importar TF.
+# Reativar quando migrar para A1.Flex. Ver incident_20260613.md.
+LSTM_ENABLED     = False
 LSTM_LOOKBACK    = 60    # candles fed to the network
 LSTM_MODEL_PATH  = "models/lstm_eurusd_1h.h5"
 LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
@@ -116,7 +119,7 @@ LSTM_SCALER_PATH = "models/lstm_scaler.pkl"
 # ── XGBoost ensemble ──────────────────────────────────────────────────────────
 XGBOOST_ENABLED      = True
 XGBOOST_MODEL_PATH   = "models/xgboost_eurusd.pkl"
-XGBOOST_REQUIRE_CONSENSUS = True   # cancel signal if LSTM and XGBoost disagree
+XGBOOST_REQUIRE_CONSENSUS = False  # v1.1 stopgap: LSTM off → consenso zeraria tudo (50 não é >50). Reativar com LSTM no A1.Flex.
 
 # ── FinBERT NLP sentiment ─────────────────────────────────────────────────────
 FINBERT_ENABLED = True
@@ -166,8 +169,9 @@ PAPER_TRADING_COMMISSION_PCT = 0.0005  # 0.05% por lado
 # Sinais com final_score < threshold são LOGADOS mas NÃO executam trade
 SIGNAL_CONFIDENCE_THRESHOLD = 55
 
-# Versionamento da estratégia para análise pós-06/06
-STRATEGY_VERSION = "v1.0"
+# Versionamento da estratégia. v1.1 (2026-06-14): stopgap EUR/USD XGBoost-only
+# (LSTM off, consenso off) na VM de 1GB. Dados v1.1 NÃO se misturam com v1.0 na análise.
+STRATEGY_VERSION = "v1.1"
 
 # ── News Intelligence — Phase 2 (Gemini + GPT-4o) ────────────────────────────
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
